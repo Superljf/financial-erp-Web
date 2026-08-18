@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>财务 ERP 前端交互原型</title>
+<style>
+  /* ============ 设计令牌 ============ */
+  :root{
+    --primary:#1677ff;
+    --primary-hover:#4096ff;
+    --primary-bg:#e8f1ff;
+    --primary-deep:#0958d9;
+
+    --bg:#f5f7fa;
+    --bg-2:#ffffff;
+    --card:#ffffff;
+    --border:#ebeef5;
+    --border-soft:#f2f3f5;
+    --border-strong:#dcdfe6;
+
+    --text:#1d2129;
+    --text-2:#4e5969;
+    --text-3:#86909c;
+    --text-4:#c9cdd4;
+
+    --success:#00b42a;
+    --success-bg:#e8ffea;
+    --danger:#f53f3f;
+    --danger-bg:#ffece8;
+    --warning:#ff7d00;
+    --warning-bg:#fff3e0;
+
+    --hero-blue:linear-gradient(135deg,#4080ff 0%,#2756d9 100%);
+    --radius:8px;
+    --radius-lg:12px;
+    --shadow-sm:0 2px 6px rgba(0,0,0,.04);
+    --shadow:0 6px 20px rgba(0,0,0,.06);
+    --shadow-lg:0 12px 40px rgba(0,0,0,.10);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;font-family:"PingFang SC","Microsoft YaHei",-apple-system,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;}
+  button{font-family:inherit;cursor:pointer;}
+
+  /* ============ 背景：流线曲线纹理 ============ */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900' preserveAspectRatio='none'><defs><linearGradient id='g1' x1='0' x2='1'><stop offset='0' stop-color='%23dde9ff' stop-opacity='.5'/><stop offset='1' stop-color='%23dde9ff' stop-opacity='0'/></linearGradient><linearGradient id='g2' x1='0' x2='1'><stop offset='0' stop-color='%23ccd9f5' stop-opacity='.4'/><stop offset='1' stop-color='%23ccd9f5' stop-opacity='0'/></linearGradient></defs><path d='M-100 380 Q400 200 900 320 T1700 220' fill='none' stroke='url(%23g1)' stroke-width='160'/><path d='M-100 580 Q500 440 1000 540 T1700 470' fill='none' stroke='url(%23g2)' stroke-width='110'/><path d='M-100 760 Q600 660 1100 720 T1700 690' fill='none' stroke='url(%23g1)' stroke-width='80'/></svg>");
+    background-size:cover; background-position:center;
+  }
+  #app, #modal-root{position:relative; z-index:1;}
+
+  /* ============ 顶部导航（统一） ============ */
+  .top-nav{
+    height:60px; background:var(--bg-2);
+    display:flex; align-items:center; padding:0 28px;
+    border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50;
+  }
+  .top-nav .title{font-size:16px; font-weight:600; margin-left:0;}
+  .top-nav .spacer{flex:1;}
+  .top-nav .company-badge{
+    background:var(--primary-bg); color:var(--primary);
+    padding:5px 14px; border-radius:20px; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .top-nav .account-badge{
+    background:#eef3ff; color:#2756d9;
+    padding:5px 14px; border-radius:20px; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px; margin-left:10px;
+  }
+  .top-nav .logout{
+    margin-left:16px; color:var(--text-3); font-size:13px;
+    display:inline-flex; align-items:center; gap:4px; cursor:pointer;
+    background:none; border:none; padding:0;
+  }
+  .top-nav .logout:hover{color:var(--primary);}
+  /* 顶部内联菜单（公司管理/数据管理、学员档案/业绩报表/课耗报表） */
+  .top-nav .nav-menu{display:flex; align-items:stretch; height:100%; margin-left:28px; gap:2px;}
+  .top-nav .nav-item{
+    position:relative; background:none; border:none; font-family:inherit;
+    font-size:14px; color:var(--text-2); cursor:pointer;
+    padding:0 16px; display:flex; align-items:center; border-radius:0;
+    transition:color .15s;
+  }
+  .top-nav .nav-item:hover{color:var(--primary);}
+  .top-nav .nav-item.active{color:var(--primary); font-weight:600;}
+  .top-nav .nav-item.active::after{
+    content:''; position:absolute; left:16px; right:16px; bottom:-1px;
+    height:2px; background:var(--primary); border-radius:2px;
+  }
+
+  /* ============ 主容器 ============ */
+  .page{max-width:1180px; margin:24px auto; padding:0 24px;}
+
+  /* ============ 卡片 ============ */
+  .card{
+    background:var(--card); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-sm); border:1px solid var(--border-soft);
+    overflow:hidden; margin-bottom:18px;
+  }
+
+  /* ============ 节标题（带 icon） ============ */
+  .sec-title{
+    padding:18px 24px 18px; font-size:16px; font-weight:600;
+    display:flex; align-items:center; gap:10px; color:var(--text);
+  }
+  .sec-title + .tabs{margin-top:-8px;}
+  .tabs + .filter-bar{padding-top:16px;}
+  /* 去除头部标题区后，卡片首个元素补回顶部间距，避免贴顶（仅作用于无标题卡片的首元素） */
+  .card > .table-toolbar:first-child,
+  .card > .filter-bar:first-child{padding-top:16px;}
+  .sec-title .ico{
+    width:26px; height:26px; border-radius:7px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--warning-bg); color:var(--warning); font-size:13px;
+  }
+  .sec-title .ico.blue{background:var(--primary-bg); color:var(--primary);}
+  .sec-title .ico.orange{background:var(--warning-bg); color:var(--warning);}
+  .sec-title .ico.green{background:var(--success-bg); color:var(--success);}
+  .sec-title .right{margin-left:auto;}
+
+  /* ============ 按钮 ============ */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 16px;border-radius:var(--radius);border:1px solid transparent;font-size:14px;transition:.15s;background:#fff;}
+  .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn-primary:hover{background:var(--primary-hover);border-color:var(--primary-hover);}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.25);}
+  .btn-secondary{background:#fff;color:var(--text-2);border-color:var(--border-strong);}
+  .btn-secondary:hover{border-color:var(--primary);color:var(--primary);}
+  .btn-sm{height:28px;padding:0 12px;font-size:13px;}
+  .btn-link{background:none;border:none;color:var(--primary);padding:0 4px;}
+  .btn-void{background:#fff;color:var(--danger);border:1px solid var(--danger);}
+  .btn-void:hover{background:var(--danger);color:#fff;}
+
+  /* ============ 文件选择器 ============ */
+  .file-picker{display:flex;align-items:center;gap:12px;margin:6px 0 14px;padding:12px 14px;border:1px dashed var(--border-strong);border-radius:var(--radius);background:#fff;transition:.15s;}
+  .file-picker:hover{border-color:var(--primary);background:#fafcff;}
+  .file-picker .file-input-hidden{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+  .file-picker label.file-pick-btn{cursor:pointer;height:32px;}
+  .file-picker .file-name{color:var(--text-3);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .file-picker .file-name.has-file{color:var(--text);font-weight:500;}
+
+  /* ============ 输入 ============ */
+  input[type=text],input[type=password],input:not([type]),select{
+    font-family:inherit;font-size:14px;height:34px;border:1px solid var(--border-strong);
+    border-radius:var(--radius);padding:0 12px;background:#fff;color:var(--text);outline:none;
+  }
+  input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(22,119,255,.12);}
+  /* type=date 已统一改为 .dp-trigger 自定义日历，无原生 date 输入 */
+  .input-w{min-width:180px;}
+
+  .date-wrap{position:relative;display:inline-block;cursor:pointer;}
+  .date-wrap::before{
+    content:""; position:absolute; left:9px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; pointer-events:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386909c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
+    background-repeat:no-repeat; background-size:contain;
+  }
+  .date-wrap input{font-family:inherit;font-size:14px;height:34px;padding:0 12px 0 32px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:160px;cursor:pointer;transition:.15s;}
+  .date-wrap:hover input{border-color:var(--primary);}
+  .date-wrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(22,119,255,.12);outline:none;}
+
+  /* ============ 自定义日历选择器 ============ */
+  #dp-portal{position:fixed;inset:0;pointer-events:none;z-index:300;}
+  #dp-portal .dp-overlay{position:absolute;inset:0;pointer-events:auto;background:transparent;}
+  #dp-portal .dp{position:absolute;pointer-events:auto;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:14px;width:280px;user-select:none;font-size:13px;}
+  #dp-portal .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;}
+  #dp-portal .dp-cur{display:flex;align-items:center;gap:6px;color:var(--text);font-weight:600;}
+  #dp-portal .dp-cur select{height:26px;border:1px solid var(--border);background:#fff;border-radius:5px;font-size:13px;padding:0 6px;cursor:pointer;color:var(--text);font-family:inherit;font-weight:600;}
+  #dp-portal .dp-cur select:hover{border-color:var(--primary);}
+  #dp-portal .dp-nav{display:flex;gap:4px;}
+  #dp-portal .dp-nav button{width:26px;height:26px;border:1px solid var(--border);background:#fff;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);transition:.15s;padding:0;}
+  #dp-portal .dp-nav button:hover{color:var(--primary);border-color:var(--primary);background:#fff;}
+  #dp-portal .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;}
+  #dp-portal .dp-dow{font-size:11px;color:var(--text-3);padding:6px 0 4px;font-weight:500;}
+  #dp-portal .dp-cell{padding:7px 0;border-radius:5px;cursor:pointer;color:var(--text);transition:.12s;line-height:1;}
+  #dp-portal .dp-cell:hover{background:var(--primary-bg);}
+  #dp-portal .dp-cell.dim{color:var(--text-4);}
+  #dp-portal .dp-cell.today{font-weight:700;color:var(--primary);position:relative;}
+  #dp-portal .dp-cell.today::after{content:"";position:absolute;left:50%;bottom:2px;width:3px;height:3px;background:var(--primary);border-radius:50%;transform:translateX(-50%);}
+  #dp-portal .dp-cell.selected{background:var(--primary);color:#fff;font-weight:600;}
+  #dp-portal .dp-cell.selected:hover{background:var(--primary-hover);}
+  #dp-portal .dp-foot{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  #dp-portal .dp-foot button{border:none;background:none;color:var(--primary);font-size:13px;cursor:pointer;padding:5px 10px;border-radius:5px;font-family:inherit;}
+  #dp-portal .dp-foot button:hover{background:var(--primary-bg);}
+  #dp-portal .dp-foot .dp-today{color:var(--text-2);}
+  #dp-portal .dp-foot .dp-today:hover{color:var(--primary);background:var(--primary-bg);}
+
+  /* ============ Tag ============ */
+  .tag{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;line-height:18px;font-weight:500;}
+  .tag-green{background:var(--success-bg);color:var(--success);}
+  .tag-blue{background:var(--primary-bg);color:var(--primary);}
+  .tag-orange{background:var(--warning-bg);color:var(--warning);}
+  .tag-gray{background:#f2f3f5;color:var(--text-3);}
+
+  /* ============ 筛选条 ============ */
+  .filter-bar{
+    padding:0 24px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border-soft); background:#fff;
+  }
+  .filter-bar .label{color:var(--text-2); font-size:14px;}
+  .filter-bar .spacer{flex:1;}
+  .filter-bar .sep{color:var(--text-3); margin:0 2px;}
+  .filter-bar .tip{font-size:13px; color:var(--text-3); padding:0 24px 12px; background:#fff;}
+  /* 筛选条行尾右对齐展示累计金额（报读=primary / 课耗=warning / 退费=danger） */
+  .filter-bar .filter-count{font-size:13px; color:var(--text-3);}
+
+  /* ============ 搜索 hero（百度风格） ============ */
+  .search-hero{display:flex;flex-direction:column;align-items:center;padding:64px 24px 12px;}
+  .search-hero .hero-logo{height:42px;width:auto;margin-bottom:14px;}
+  .search-hero .search-bar{display:flex;align-items:center;width:100%;max-width:680px;height:48px;border:2px solid #dfe1e5;border-radius:24px;padding:0 6px 0 18px;background:#fff;transition:.18s;gap:10px;}
+  .search-hero .search-bar:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(22,119,255,.12);}
+  .search-hero .lead{display:inline-flex;color:var(--text-3);width:18px;height:18px;flex-shrink:0;}
+  .search-hero input{flex:1;border:none;outline:none;background:transparent;font-size:15px;color:var(--text);font-family:inherit;height:100%;padding:0;min-width:0;box-shadow:none;appearance:none;-webkit-appearance:none;}
+  .search-hero input:focus{border:none;outline:none;box-shadow:none;-webkit-box-shadow:none;}
+  .search-hero input::placeholder{color:var(--text-3);}
+  .search-hero .btn-search{height:36px;padding:0 22px;border:none;border-radius:18px;background:var(--primary);color:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .search-hero .btn-search:hover{background:var(--primary-hover,#4096ff);}
+  .search-hero .search-tip{margin-top:12px;font-size:13px;color:var(--text-3);}
+  .search-hero .search-tip .link{border:none;background:none;color:var(--primary);cursor:pointer;font-family:inherit;font-size:13px;padding:0 4px;}
+  .search-hero .search-tip .link:hover{text-decoration:underline;}
+  .search-hero .btn-clear{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;background:transparent;border-radius:50%;cursor:pointer;padding:0;opacity:0;transition:opacity .14s, background-color .14s;flex-shrink:0;}
+  .search-hero .search-bar.has-text .btn-clear{opacity:1;}
+  .search-hero .btn-clear:hover{background:#f3f4f6;}
+  .search-hero .btn-clear:focus{outline:none;}
+  .search-hero .btn-clear .clear-icon{width:16px;height:16px;display:block;pointer-events:none;}
+
+  /* 学员查询列表：收窄并居中，与上方搜索框宽度对齐，避免整页撑开后显得过宽 */
+  .profile-list-wrap{max-width:680px; margin:0 auto;}
+
+  /* ============ 表格 ============ */
+  table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;}
+  th,td{padding:14px 20px;text-align:left;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+  th{background:#fafbfc;color:var(--text-2);font-weight:500;font-size:13px;}
+  th:first-child, td:first-child{padding-left:24px;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--primary);}
+  th.sortable.active{color:var(--primary);}
+  th.sortable .arrow{margin-left:4px;font-size:10px;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:"Microsoft YaHei",-apple-system,Helvetica,Arial,sans-serif;}
+  .sticky-grid thead th{position:sticky;top:0;background:#fafbfc;z-index:2;}
+  .sticky-grid tbody td:first-child,
+  .sticky-grid thead th:first-child{position:sticky;left:0;background:#fff;z-index:1;}
+  .sticky-grid thead th:first-child{background:#fafbfc;z-index:3;}
+  .sticky-grid th,.sticky-grid td{padding:0 16px;font-size:13px;line-height:1;vertical-align:middle;}
+  .sticky-grid thead th{height:44px;}
+  .sticky-grid tbody td{height:60px;}
+  .sticky-grid tbody td:first-child{font-size:14px;font-weight:500;}
+  .sticky-grid .check-cell{font-size:16px;}
+  /* 行高锁定的关键：单元格内容包一层固定高度 flex 容器，脱离 td 高度受 border-collapse 限制的问题 */
+  .sticky-grid .cg-h,.sticky-grid .cg-c{display:flex;align-items:center;box-sizing:border-box;}
+  .sticky-grid .cg-h{height:44px;justify-content:center;}
+  .sticky-grid thead th:first-child .cg-h{justify-content:flex-start;}
+  .sticky-grid .cg-c{height:20px;}
+  .sticky-grid td.check-cell .cg-c{justify-content:center;}
+  th.num{text-align:right;}
+  tbody tr:hover{background:#fafbfc;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.empty,tr.empty td{text-align:center;color:var(--text-3);padding:36px;font-size:14px;}
+
+  /* ============ 公司管理列表：横向滚动 + 操作列固定 ============ */
+  .company-table-wrap{
+    overflow-x:auto;
+    overflow-y:visible;
+    background:#fff;
+  }
+  .company-table-wrap > table{min-width:1040px;table-layout:fixed;}
+  .company-table-wrap th, .company-table-wrap td{padding:12px 14px;font-size:13px;}
+  .company-table-wrap th:first-child, .company-table-wrap td:first-child{padding-left:18px;}
+  .company-table-wrap th.col-op,
+  .company-table-wrap td.col-op{
+    position:sticky;
+    right:0;
+    background:#fff;
+    z-index:2;
+    box-shadow:-6px 0 8px -4px rgba(15,31,53,.08);
+  }
+  .company-table-wrap thead th.col-op{background:#fafbfc;z-index:3;}
+  .company-table-wrap tbody tr:hover td.col-op{background:#fafbfc;}
+  .company-table-wrap th.col-id{width:56px;}
+  .company-table-wrap th.col-tax{width:200px;}
+  .company-table-wrap th.col-name{width:220px;}
+  .company-table-wrap th.col-account{width:110px;}
+  .company-table-wrap th.col-pwd{width:140px;}
+  .company-table-wrap th.col-status{width:100px;}
+  .company-table-wrap th.col-found{width:120px;}
+  .company-table-wrap th.col-cancel{width:120px;}
+  .company-table-wrap th.col-op{width:96px;}
+  .company-table-wrap td.col-tax,
+  .company-table-wrap td.col-name{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  /* ============ 分页 ============ */
+  .pagination{
+    padding:14px 24px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    border-top:1px solid var(--border-soft); background:#fff;
+  }
+  .pagination .info{color:var(--text-3); font-size:13px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .page-size-wrap{color:var(--text-3); display:inline-flex; align-items:center; gap:4px;}
+  .page-size{height:30px; padding:0 6px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text); font-family:inherit; font-size:13px; cursor:pointer; outline:none;}
+  .page-size:hover{border-color:var(--primary);}
+  .page-size:focus{border-color:var(--primary);}
+  .pagination .pages{display:flex; align-items:center; gap:6px;}
+  .page-btn{
+    min-width:32px; height:32px; padding:0 8px; border-radius:6px; border:1px solid var(--border);
+    background:#fff; color:var(--text-2); cursor:pointer; font-size:13px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .page-btn:hover:not(:disabled){border-color:var(--primary); color:var(--primary);}
+  .page-btn:disabled{background:#f7f8fa; color:var(--text-4); cursor:not-allowed;}
+  .page-btn.active{background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600;}
+  .page-btn.arrow{padding:0 10px;}
+
+  /* ============ 弹窗 ============ */
+  .overlay{position:fixed;inset:0;background:rgba(15,30,60,.45);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .modal{background:#fff;border-radius:var(--radius-lg);width:520px;max-width:92vw;max-height:90vh;overflow:auto;box-shadow:var(--shadow-lg);}
+  .modal.wide{width:680px;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px;}
+  .modal-close{border:none;background:none;font-size:22px;color:var(--text-3);cursor:pointer;line-height:1;padding:0 4px;}
+  .modal-body{padding:22px 24px;}
+  .modal-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:#fafbfc;}
+
+  /* ============ 表单 ============ */
+  label.f{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .f-row{display:flex;gap:16px;margin-bottom:14px;}
+  .f-row > label.f{flex:1;min-width:0;margin-bottom:0;}
+  label.f .lab{color:var(--text-2);font-size:13px;}
+  label.f .req{color:var(--danger);}
+  label.f input:disabled,
+  label.f input[readonly],
+  label.f select:disabled,
+  label.f select[readonly],
+  label.f textarea:disabled{background:#f5f7fa;color:var(--text-3);cursor:not-allowed;border-color:var(--border);}
+  /* 日期框特例：与报表日期框风格一致（白底、可点击、无灰底/箭头） */
+  label.f .date-wrap input{background:#fff;color:var(--text);cursor:pointer;}
+
+  /* ============ 错误信息 ============ */
+  .err{color:var(--danger);font-size:13px;padding:8px 12px;background:var(--danger-bg);border-radius:6px;}
+  .err:empty{display:none;}
+  input.invalid{border-color:var(--danger)!important;}
+  select.invalid{border-color:var(--danger)!important;}
+  /* 弹窗下拉框现代化：去原生方块箭头，改为自定义灰色下拉箭头 */
+  .modal-body select{
+    appearance:none;-webkit-appearance:none;-moz-appearance:none;
+    background:#fff url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5YWEzYjIiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwb2x5bGluZSBwb2ludHM9IjYgOSAxMiAxNSAxOCA5Ii8+PC9zdmc+") no-repeat right 12px center / 14px 14px;
+    padding-right:34px;cursor:pointer;
+  }
+  /* 未选择时占位项（如「请选择年级」）显示为灰色，与输入框 placeholder 一致 */
+  .modal-body select:required:invalid{color:var(--text-3);}
+  .enroll-hint{text-align:center;color:var(--text-3);font-size:14px;padding:0 24px 28px;}
+  .enroll-hint .link-btn{border:none;background:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0 2px;font-family:inherit;}
+  .enroll-hint .link-btn:hover{text-decoration:underline;}
+
+  /* ============ Toast ============ */
+  .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);padding:10px 18px;border-radius:8px;z-index:200;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .toast.ok{border-color:var(--success);color:var(--success);}
+  .toast.err{border-color:var(--danger);color:var(--danger);}
+
+  /* ============ 首页 ============ */
+  .home-page{
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:60px 20px;
+  }
+  .home-logo{
+    width:64px; height:64px; border-radius:18px;
+    background:var(--hero-blue); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:30px; margin-bottom:18px; box-shadow:0 6px 20px rgba(64,128,255,.3);
+  }
+  .home-title{font-size:30px; font-weight:700; color:var(--text); margin-bottom:8px;}
+  .home-sub{color:var(--text-3); margin-bottom:42px; font-size:14px;}
+  .entry-grid{display:flex; gap:22px; flex-wrap:wrap; justify-content:center;}
+  .entry{
+    width:260px; background:var(--card); border-radius:var(--radius-lg); padding:32px 26px; cursor:pointer;
+    border:1px solid var(--border); transition:.2s; box-shadow:var(--shadow-sm); text-align:center;
+  }
+  .entry:hover{transform:translateY(-4px); box-shadow:var(--shadow-lg); border-color:var(--primary);}
+  .entry .ico{
+    width:56px; height:56px; border-radius:14px; margin:0 auto 14px;
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+  }
+  .entry.admin .ico{background:var(--primary-bg); color:var(--primary);}
+  .entry.company .ico{background:var(--warning-bg); color:var(--warning);}
+  .entry h3{margin:0 0 6px; font-size:17px; color:var(--text);}
+  .entry p{color:var(--text-3); font-size:13px; margin:0; line-height:1.6;}
+
+  /* ============ 学员档案 hero 卡 ============ */
+  .hero{
+    background:var(--hero-blue); color:#fff; border-radius:var(--radius-lg);
+    padding:28px 36px; display:flex; align-items:center; gap:50px; flex-wrap:wrap;
+    box-shadow:0 8px 24px rgba(64,128,255,.25);
+  }
+  .hero-item{display:flex; align-items:center; gap:14px; min-width:0;}
+  .hero-item .ico-circle{
+    width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.2);
+    display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;
+  }
+  .hero-item .info{min-width:0;}
+  .hero-item .lab{font-size:12px; opacity:.85; margin-bottom:2px;}
+  .hero-item .val{font-size:18px; font-weight:600; line-height:1.4;}
+  .hero-amount{display:flex; align-items:center; gap:20px; flex:1; min-width:0;}
+  .hero-amount .hero-item .val{font-size:22px; font-weight:700; line-height:1.2;}
+  .hero-amount .hero-item .val small{font-size:13px; font-weight:500; margin-left:4px; opacity:.9;}
+  .hero-amount .hero-item .lab{margin-bottom:0;}
+  .hero-actions{display:flex;gap:10px;flex-shrink:0; margin-left:auto;}
+  .btn-light:disabled{opacity:.55;cursor:not-allowed;}
+  .tip-wrap{position:relative;display:inline-flex;}
+  .tip-wrap.is-disabled:hover::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 8px);white-space:nowrap;background:rgba(0,0,0,.82);color:#fff;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:6px;z-index:50;pointer-events:none;}
+  .tip-wrap.is-disabled:hover::before{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 2px);border:6px solid transparent;border-top-color:rgba(0,0,0,.82);z-index:50;pointer-events:none;}
+  .btn-light{display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#2756d9;border:none;border-radius:8px;padding:8px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn-light:hover{background:#eef3ff;}
+
+  /* ============ 累计金额条 ============ */
+  .total-bar{
+    margin:0 24px; padding:12px 18px; background:linear-gradient(90deg,#fff7e6,#fff3e0);
+    border-radius:8px; display:flex; align-items:center; justify-content:space-between;
+    border:1px solid #ffe6c0;
+  }
+  .total-bar .lbl{color:var(--text-2); font-size:14px;}
+  .total-bar .num{color:var(--warning); font-size:18px; font-weight:700; font-family:"Microsoft YaHei",-apple-system,Helvetica,Arial,sans-serif;}
+  .total-bar .num small{font-size:13px; font-weight:500; margin-left:2px; opacity:.85;}
+
+  /* ============ Tabs (页面顶部主菜单) ============ */
+  .tabs{display:flex; gap:32px; padding:0 0 0 20px; border-bottom:1px solid var(--border-soft); background:transparent; margin-bottom:0;}
+  .tab{padding:14px 0; cursor:pointer; color:var(--text-2); border-bottom:2px solid transparent; font-size:15px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:color .15s;}
+  .tab:hover{color:var(--primary);}
+  .tab.active{color:var(--primary); border-bottom-color:var(--primary); font-weight:600;}
+
+  /* ============ 公司管理 - 表格增强 ============ */
+  .table-toolbar{
+    padding:0 24px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border-soft); background:#fff;
+  }
+  .table-toolbar .spacer{flex:1;}
+  .table-toolbar .count{font-size:13px; color:var(--text-3); padding:0 24px 12px; background:#fff;}
+  .count{font-size:13px; color:var(--text-3); padding:14px 24px 12px; background:#fff;}
+
+  /* 公司管理 - 登记状态：带色圆圈 + 普通文本 */
+  .status-dot{width:8px; height:8px; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:6px; background:var(--text-3);}
+  .status-dot.dot-blue{background:#157CFF;}
+  .status-dot.dot-gray{background:#FFB900;}
+
+  /* ============ 数据管理 - 月份网格 ============ */
+  .grid-right{padding:0;overflow:auto;max-height:520px;}
+  .check-cell{text-align:center;cursor:default;font-size:18px;}
+  .check-cell .ck{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--success-bg);color:var(--success);font-size:14px;}
+  .check-cell .ck svg{width:14px;height:14px;display:block;}
+  .check-cell.empty{color:var(--text-4);cursor:default;}
+  .pwd-cell{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;width:160px;min-width:160px;max-width:160px;}
+  .pwd-text{font-variant-numeric:tabular-nums;letter-spacing:1px;flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pwd-eye{border:none;background:none;padding:3px;margin:0;cursor:pointer;color:var(--text-3);display:inline-flex;align-items:center;justify-content:center;line-height:0;border-radius:5px;transition:.15s;}
+  .pwd-eye:hover{color:var(--primary);background:var(--primary-bg);}
+  .pwd-eye svg{width:15px;height:15px;display:block;}
+
+  /* ============ 文件 pill ============ */
+  .file-pill{
+    color:var(--primary); cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:13px;
+    padding:0; background:transparent; border-radius:6px;
+    transition:background .15s;
+  }
+  .file-pill:hover{background:var(--primary-bg);}
+  .file-pill svg{width:14px;height:14px;display:block;flex-shrink:0;}
+  .file-pill .file-name{max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+  /* ============ Login ============ */
+  .login-page{min-height:calc(100vh - 60px); display:flex; align-items:center; justify-content:center; padding:40px 20px;}
+  .login-card{width:400px; background:#fff; border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:40px 36px;}
+  .login-card h2{margin:0 0 4px; font-size:22px; text-align:center;}
+  .login-card .sub{color:var(--text-3); font-size:13px; margin-bottom:28px; text-align:center;}
+  .login-card .btn{width:100%; height:40px; margin-top:10px; font-size:15px;}
+  .login-tip{margin-top:16px; font-size:12px; color:var(--text-3); text-align:center; line-height:1.7;}
+  .login-pwd{position:relative; display:block; width:100%;}
+  .login-pwd input{width:100%; box-sizing:border-box; padding-right:40px;}
+  .login-pwd .pwd-eye{position:absolute; right:8px; top:50%; transform:translateY(-50%);}
+
+  /* ============ 公司端 - 学员搜索触发卡 ============ */
+  .profile-hero{
+    text-align:center; padding:60px 30px; background:#fff; border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-sm); border:1px solid var(--border-soft);
+  }
+  .profile-hero .ico{
+    width:64px; height:64px; border-radius:50%; background:var(--primary-bg);
+    color:var(--primary); display:flex; align-items:center; justify-content:center;
+    margin:0 auto 18px; font-size:26px;
+  }
+  .profile-hero h3{margin:0 0 8px; color:var(--text);}
+  .profile-hero p{color:var(--text-3); margin:0 0 22px;}
+
+  /* ============ 自适应 ============ */
+  @media (max-width: 768px) {
+    .page{padding:0 14px;}
+    .filter-bar, .table-toolbar{padding:14px 16px;}
+    .hero{padding:20px 18px; gap:18px;}
+    .hero-amount{margin-left:0; width:100%;}
+    .entry{width:100%;}
+    .sec-title{padding:16px 18px 18px;}
+    th, td{padding:10px 12px;}
+  }
+  .ico svg{width:22px;height:22px;display:block;}
+  .ico-circle svg{width:22px;height:22px;display:block;}
+  .home-logo svg{width:46px;height:46px;display:block;}
+  .i{display:inline-flex;align-items:center;justify-content:center;vertical-align:-3px;margin-right:5px;}
+  .i svg{width:15px;height:15px;display:block;}
+  .toast svg{width:15px;height:15px;vertical-align:-2px;margin-right:4px;}
+  .company-badge .i svg{width:14px;height:14px;}
+
+  /* ============ 剩余学费数字字体：DINBEK Bold（内联，无需安装） ============ */
+  @font-face{
+    font-family:'DINBEK';
+    src:url(data:font/ttf;base64,AAEAAAAMAIAAAwBAT1MvMqlMLSIAAAFIAAAAYFZETVh1vH07AAAFLAAABeBjbWFwECR5ZAAACwwAAAWaZ2FzcAAXAAkAAFzYAAAAEGdseWao7zbGAAAQqAAARMhoZWFk47wg9AAAAMwAAAA2aGhlYQhUBJ4AAAEEAAAAJGhtdHjofi9oAAABqAAAA4Rsb2NhY2tznAAAVXAAAAHEbWF4cADpAFMAAAEoAAAAIG5hbWXQ49tGAABXNAAAA61wb3N0XS7g5AAAWuQAAAH0AAEAAAABAABpnUXAXw889QAJA+gAAAAAulv/ywAAAADF6N0g/9T/MgSGA/cAAAADAAIAAAAAAAAAAQAAA/f/MgAABLv/1P/PBIYAAQAAAAAAAAAAAAAAAAAAAOEAAQAAAOEAUgAHAAAAAAABAAAAAAAAAAAAAAAAAAAAAAADAcYBkAAFAAACvAKKAAAAjwK8AooAAAHFADIBAwAAAgAFAwAAAAIABIAAAK8QACBIAAAAAAAAAABBbHRzAEAAICXKA/f/MgAAA/cAziAAABEEAAAAAgkCyAAAACAAAADoAAABWwBwAdAARAKzADwCawATA1AANALRADwBAwBEAVAAUAFQADYB7gA3Ah8AMgEXAEQBqgA7AR0ARAGTAAACHwA3Ah8AZwIfADsCHwAqAh8AHwIfADkCHwAwAh8AMgIfACwCHwAzATUAXQE1AF0EAwAyAh8AMgQDADICCwBCAvYAOQJ+AAUCkgBTAmwAOwKTAFMCXQBTAk4AUwKIADsCrQBTATEAUwH/AAMCmQBTAj8AUwMrAFMCxwBTAoQAOwJ0AFMCgwA7Ao4AUwJPABMCOwAeApwASAJFAAMDdwAGAlsABQI8AAMCJAAoAXoAUAGTAAABegAqAloAPwJaAAAB9ABoAhYAJAIwAEkB4AAvAjEAMwIkAC8BVgAjAisAMwI5AEkBEwBHARP/6QIvAEkBRQBEA2wASQI9AEkCHwAzAjAASQIxADMBxwBJAfUAFgFgAB4CPQBDAe0ABAL3AAQCDwAMAe4ABAHeACUByQArAV4AbgHJACsCXgAlAn4ABQJ+AAUCbAA7Al0AUwLHAFMChAA7ApwASAIWACQCFgAkAhYAJAIWACQCFgAkAhYAJAHiAC8CJAAvAiQALwIkAC8CJAAvARMAOwETABMBE//UARP/4wI9AEkCHwAzAh8AMwIfADMCHwAzAh8AMwI9AEMCPQBDAj0AQwI9AEMCQwA5Ad4ANwHzAC8CQwAoAhMAPQHtAFMCnAAjAj4ASQNMADwDTAA8A5wALQH0AMMB9ABUAloAMgPTAAMCjAA7A1MANwIfADIEAwC5BAMAjgI7AAMCQABGAisAOAKtAFMCUABMAeoAOQHGADABzgA3AoQAOwNGACQCHwAzAgsAJAFbAEsCHwAuAlQAAwGrAAsCXgAlAnoAAwJ0ACICdABDA04ARADoAAACfgAFAn4ABQKEADsDxgA7A18AMwIfADIEAwA7AeIARAHiAEQBEQBEAREARAIfAC4CfAA3Ae4ABAI8AAMBMQBTARMASQJDADkBDwBEAeUARAS7ADQCfgAFAl0AUwJ+AAUCXQBTAl0AUwExAEoBMf/fATH/8wExACEChAA7AoQAOwKEADsCnABIApwASAKcAEgBEwBJAfQAQgH0AEUB9ABcAfQAVgH0ALcB9AB3AfQAoAH0ADkB9ACpAfQAQgKIADsCKwAzAisAMwExAFMCTwATAfUAFgDoAAACKwAzAogAOwAAAAEAAQEBAQEADAD4CP8ACAAJ//4ACQAK//4ACgAL//0ACwAM//0ADAAN//0ADQAO//0ADgAP//0ADwAQ//wAEAAR//wAEQAS//wAEgAT//wAEwAU//wAFAAV//sAFQAW//sAFgAX//sAFwAY//sAGAAZ//sAGQAa//oAGgAb//oAGwAc//oAHAAd//oAHQAe//oAHgAf//kAHwAg//kAIAAh//kAIQAi//kAIgAj//gAIwAk//gAJAAl//gAJQAm//gAJgAn//gAJwAo//cAKAAp//cAKQAq//cAKgAr//cAKwAs//cALAAt//YALQAu//YALgAv//YALwAw//YAMAAx//YAMQAy//UAMgAz//UAMwA0//UANAA1//UANQA2//UANgA3//QANwA4//QAOAA5//QAOQA6//QAOgA7//QAOwA8//MAPAA9//MAPQA+//MAPgA///MAPwBA//MAQABB//IAQQBC//IAQgBD//IAQwBF//IARABG//EARQBH//EARgBI//EARwBJ//EASABK//EASQBL//AASgBM//AASwBN//AATABO//AATQBP//AATgBQ/+8ATwBR/+8AUABS/+8AUQBT/+8AUgBU/+8AUwBV/+4AVABW/+4AVQBX/+4AVgBY/+4AVwBZ/+4AWABa/+0AWQBb/+0AWgBc/+0AWwBd/+0AXABe/+0AXQBf/+wAXgBg/+wAXwBh/+wAYABi/+wAYQBj/+wAYgBk/+sAYwBl/+sAZABm/+sAZQBn/+sAZgBo/+oAZwBp/+oAaABq/+oAaQBr/+oAagBs/+oAawBt/+kAbABu/+kAbQBv/+kAbgBw/+kAbwBx/+kAcABy/+gAcQBz/+gAcgB0/+gAcwB1/+gAdAB2/+gAdQB3/+cAdgB4/+cAdwB5/+cAeAB6/+cAeQB7/+cAegB8/+YAewB9/+YAfAB+/+YAfQB//+YAfgCA/+YAfwCB/+UAgACC/+UAgQCD/+UAggCE/+UAgwCF/+UAhACG/+QAhQCH/+QAhgCJ/+QAhwCK/+QAiACL/+MAiQCM/+MAigCN/+MAiwCO/+MAjACP/+MAjQCQ/+IAjgCR/+IAjwCS/+IAkACT/+IAkQCU/+IAkgCV/+EAkwCW/+EAlACX/+EAlQCY/+EAlgCZ/+EAlwCa/+AAmACb/+AAmQCc/+AAmgCd/+AAmwCe/+AAnACf/98AnQCg/98AngCh/98AnwCi/98AoACj/98AoQCk/94AogCl/94AowCm/94ApACn/94ApQCo/94ApgCp/90ApwCq/90AqACr/90AqQCs/90AqgCt/9wAqwCu/9wArACv/9wArQCw/9wArgCx/9wArwCy/9sAsACz/9sAsQC0/9sAsgC1/9sAswC2/9sAtAC3/9oAtQC4/9oAtgC5/9oAtwC6/9oAuAC7/9oAuQC8/9kAugC9/9kAuwC+/9kAvAC//9kAvQDA/9kAvgDB/9gAvwDC/9gAwADD/9gAwQDE/9gAwgDF/9gAwwDG/9cAxADH/9cAxQDI/9cAxgDJ/9cAxwDK/9cAyADL/9YAyQDN/9YAygDO/9YAywDP/9YAzADQ/9UAzQDR/9UAzgDS/9UAzwDT/9UA0ADU/9UA0QDV/9QA0gDW/9QA0wDX/9QA1ADY/9QA1QDZ/9QA1gDa/9MA1wDb/9MA2ADc/9MA2QDd/9MA2gDe/9MA2wDf/9IA3ADg/9IA3QDh/9IA3gDi/9IA3wDj/9IA4ADk/9EA4QDl/9EA4gDm/9EA4wDn/9EA5ADo/9EA5QDp/9AA5gDq/9AA5wDr/9AA6ADs/9AA6QDt/9AA6gDu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AAAAAAASAAsBiAADAAEECQAAADoBkwADAAEECQABABYBzQADAAEECQACAAgB4wADAAEECQADAEYB6wADAAEECQAEABYCMQADAAEECQAFAEQCRwADAAEECQAGABQCiwBHAGUAbgBlAHIAYQB0AGUAZAAgAGIAeQAgAEYAbwBuAHQAbwBnAHIAYQBwAGgAZQByACAANAAuADAARABJAE4AQgBFAEsAQgBvAGwAZABBAGwAdABzAHkAcwAgAEYAbwBuAHQAbwBnAHIAYQBwAGgAZQByACAANAAuADAAIABEAEkATgBCAEUASwAgAEIAbwBsAGQARABJAE4AQgBFAEsAIABCAG8AbABkAEEAbAB0AHMAeQBzACAARgBvAG4AdABvAGcAcgBhAHAAaABlAHIAIAA0AC4AMAAgADIAOAAvADAAMQAvADIAMAAwADMARABJAE4AQgBFAEsAQgBvAGwAZEdlbmVyYXRlZCBieSBGb250b2dyYXBoZXIgNC4wRElOQkVLIEJvbGRCb2xkQWx0c3lzIEZvbnRvZ3JhcGhlciA0LjAgRElOQkVLIEJvbGRESU5CRUsgQm9sZEFsdHN5cyBGb250b2dyYXBoZXIgNC4wIDI4LzAxLzIwMDNESU5CRUtCb2xkRElOQkVLIEJvbGQARwBlAG4AZQByAGEAdABlAGQAIABiAHkAIABGAG8AbgB0AG8AZwByAGEAcABoAGUAcgAgADQALgAwAEQASQBOAEIARQBLACAAQgBvAGwAZABCAG8AbABkAEEAbAB0AHMAeQBzACAARgBvAG4AdABvAGcAcgBhAHAAaABlAHIAIAA0AC4AMAAgAEQASQBOAEIARQBLACAAQgBvAGwAZABEAEkATgBCAEUASwAgAEIAbwBsAGQAQQBsAHQAcwB5AHMAIABGAG8AbgB0AG8AZwByAGEAcABoAGUAcgAgADQALgAwACAAMgA4AC8AMAAxAC8AMgAwADAAMwBEAEkATgBCAEUASwBCAG8AbABkAAAAAAIAAAAAAAD/eQBXAAAAAAAAAAAAAAAAAAAAAAAAAAAA4QAAAAQABQAGAAcACAAJAAoACwAMAA0ADgAPABAAEQASABMAFAAVABYAFwAYABkAGgAbABwAHQAeAB8AIAAhACIAIwAkACUAJgAnACgAKQAqACsALAAtAC4ALwAwADEAMgAzADQANQA2ADcAOAA5ADoAOwA8AD0APgA/AEAAQQBCAEMARABFAEYARwBIAEkASgBLAEwATQBOAE8AUABRAFIAUwBUAFUAVgBXAFgAWQBaAFsAXABdAF4AXwBgAGEAYgBjAGQAZQBmAGcAaABpAGoAawBsAG0AbgBvAHAAcQByAHMAdAB1AHYAdwB4AHkAegB7AHwAfQB+AH8AgACBAIIAgwCEAIUAhgCHAIgAiQCKAIsAjACNAI4AjwCQAJEAkgCTAJQAlQCWAJcAmACaAJsAnACdAJ4AnwCgAKEAogCjAKQApQCmAKcAqACpAKoAqwCsAK0ArgCvALAAsQCyALMAtAC1ALYAtwC4ALkAugC7AL4AvwDCAMQAxQDGAMcAyADJAMoAywDMAM0AzgDPANAA0QDTANQA1QDWANcA2ADZANoA2wDcAN0A3gDfAOAA4QD4APkAvQECAPsA/AADAQMAvApJZG90YWNjZW50BEV1cm8AAAADAAgAAgAQAAH//wAD) format('truetype');
+    font-weight:700;
+    font-style:normal;
+    font-display:swap;
+  }
+  .din-num{
+    font-family:'DINBEK','DIN Alternate','Bahnschrift',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+    font-weight:700;
+    font-feature-settings:'tnum' 1;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.5px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="modal-root"></div>
+
+<script>
+/* ============ Mock 数据 ============ */
+function deriveStatus(c){ return c.cancel ? '已注销' : '存续'; }
+
+const companies = [
+  {id:1, tax:'91350200MA8R1A1B2C', name:'快乐智豪厦门文化有限公司', account:'ZH01', pwd:'625777', found:'2020-03-15', cancel:''},
+  {id:2, tax:'91350200MA8R2A2B3C', name:'厦门智学教育咨询有限公司', account:'ZX01', pwd:'123456', found:'2019-07-01', cancel:''},
+  {id:3, tax:'91350200MA8R3A3B4C', name:'福州优教文化有限公司', account:'YJ01', pwd:'abc123', found:'2021-01-10', cancel:'2024-12-31'},
+  {id:4, tax:'91350200MA8R4A4B5C', name:'泉州博文培训学校', account:'BW01', pwd:'qztc88', found:'2018-05-20', cancel:''},
+  {id:5, tax:'91350200MA8R5A5B6C', name:'漳州启航教育科技有限公司', account:'QH01', pwd:'zhqz66', found:'2022-09-01', cancel:''},
+  {id:6, tax:'91350200MA8R6A6B7C', name:'宁德思齐教育咨询有限公司', account:'SQ01', pwd:'ndsq99', found:'2020-11-11', cancel:''},
+  {id:7, tax:'91350200MA8R7A7B8C', name:'莆田明德文化有限公司', account:'MD01', pwd:'ptmd55', found:'2023-02-28', cancel:''},
+  {id:8, tax:'91350200MA8R8A8B9C', name:'龙岩育才教育服务中心', account:'YC01', pwd:'lyyc33', found:'2017-08-08', cancel:''},
+  {id:9, tax:'91350200MA8R9A9B0C', name:'三明启智教育咨询有限公司', account:'QZ01', pwd:'smqz77', found:'2021-06-18', cancel:''},
+  {id:10, tax:'91350200MA8R0A0B1C', name:'南平博雅文化有限公司', account:'BY01', pwd:'npby44', found:'2019-12-03', cancel:''},
+  {id:11, tax:'91350200MA8R1B1C2D', name:'厦门卓越素质培训学校', account:'ZY01', pwd:'zysz88', found:'2022-04-25', cancel:'2025-06-30'},
+  {id:12, tax:'91350200MA8R2B2C3D', name:'福州翰林教育科技有限公司', account:'HL01', pwd:'fhhl66', found:'2020-09-09', cancel:''},
+];
+
+const students = [
+  {code:'XYBH_20230929000011', name:'李宜栩', grade:'高三', remain:2193},
+  {code:'XYBH_20230929000012', name:'李宜萱', grade:'高二', remain:5020},
+  {code:'XYBH_20230929000013', name:'王梓涵', grade:'高一', remain:3180},
+  {code:'XYBH_20230929000014', name:'陈思源', grade:'高三', remain:880},
+  {code:'XYBH_20230929000015', name:'林小满', grade:'高二', remain:6400},
+  {code:'XYBH_20230929000016', name:'赵子轩', grade:'高一', remain:1500},
+  {code:'XYBH_20230929000017', name:'李宜辰', grade:'高三', remain:2200},
+];
+
+// 三条学员记录改由 cashData（出纳）/ consumeData（课耗）按学员编号实时派生，见 studentDetailHTML；原写死 liDetail 已移除。
+
+// 业绩报表不再使用独立 mock（原 genPerf），改为实时从「出纳表 cashData」取数，见 getPerfRows()。
+function genConsume(){
+  const rows=[];const subs=['物理','地理','数学','英语','化学','语文'];const t=['徐竞佳','苗伟超','张明','李华','王芳','陈静'];
+  const today=new Date().toISOString().slice(0,10);
+  for(let i=0;i<84;i++){const d=1+(i*3)%27;const st=students[i%students.length];
+    rows.push({id:`c${i}`,date:`2026-08-${String(d).padStart(2,'0')}`,company:'快乐智豪厦门文化有限公司',name:st.name,grade:st.grade,课程年级:st.grade,amt:712,subject:subs[i%t.length],teacher:t[i%t.length],学员编号: st.code});}
+  // 首条置为当天，便于演示「考勤日期=当天显示作废按钮」
+  if(rows[0]) rows[0].date=today;
+  return rows;
+}
+const consumeData = genConsume();
+
+const monthStatus = {6:{file:'汇总表202606.xlsx',date:'2026-08-11 09:30:15',status:'已导入'},7:{file:'汇总表202607.xlsx',date:'2026-08-11 14:05:42',status:'已导入'}};
+const companyMonthStatus = {'1-6':1,'1-7':1,'2-3':1,'4-5':1};
+
+// ============ 出纳表（当前实际数据，按月份聚合） ============
+const CASH_FIELDS=['年月','公司名称','纳税人识别号','交易日期','交易渠道','交易金额','清算金额','手续费','团队','业务校区','学生姓名','学员编号','学生年级','现金','转账','刷卡','在线支付','单据编号','客户账号','类型'];
+const cashData=[];
+function genCashMock(month){
+  const y=2026, mm=String(month).padStart(2,'0'), ym=`${y}-${mm}`;
+  const comp=companies[0]||{name:'快乐智豪厦门文化有限公司',tax:'91350200MA8R5X2X9K'};
+  const opts=[4284,6800,3200,1500,980,2600,5000];
+  const arr=[];
+  for(let i=0;i<30;i++){
+    const d=String(1+(i*3)%27).padStart(2,'0');
+    const date=`${y}-${mm}-${d}`;
+    const amt=opts[i%opts.length];
+    const fee=Math.round(amt*0.0025*100)/100;
+    arr.push({年月:ym,公司名称:comp.name,纳税人识别号:comp.tax,交易日期:date,交易渠道:'C扫B',交易金额:amt,清算金额:amt-fee,手续费:fee,团队:'',业务校区:'',学生姓名:students[i%students.length].name,学员编号:students[i%students.length].code,学生年级:students[i%students.length].grade,现金:'',转账:'',刷卡:'',在线支付:amt,单据编号:'',客户账号:'',类型:'预收学费'});
+  }
+  return arr;
+}
+// 初始预置 6、7、8 月实际出纳数据（演示用，真实环境由导入写入）
+[6,7,8].forEach(m=>genCashMock(m).forEach(r=>cashData.push(r)));
+// 演示退费数据（类型=预收退款，按学员编号隔离），真实环境由导入写入
+(function(){
+  const comp=companies[0]||{name:'快乐智豪厦门文化有限公司',tax:'91350200MA8R5X2X9K'};
+  const opts=[180,220,260,270];
+  for(let i=0;i<77;i++){const d=String(2+(i*4)%26).padStart(2,'0');const st=students[i%students.length];
+    cashData.push({年月:'2026-07',公司名称:comp.name,纳税人识别号:comp.tax,交易日期:`2026-07-${d}`,交易渠道:'转账',交易金额:opts[i%opts.length],清算金额:opts[i%opts.length],手续费:0,团队:'',业务校区:'',学生姓名:st.name,学员编号:st.code,学生年级:st.grade,现金:'',转账:opts[i%opts.length],刷卡:'',在线支付:'',单据编号:'',客户账号:'',类型:'预收退款'});}
+})();
+
+// 演示：新增一条「当天」的报读记录（预收学费），便于演示「交易日期=当天显示作废按钮」
+(function(){
+  const comp=companies[0]||{name:'快乐智豪厦门文化有限公司',tax:'91350200MA8R5X2X9K'};
+  const st=students[0];
+  cashData.push({id:'cash_demo_today',年月:'2026-08',公司名称:comp.name,纳税人识别号:comp.tax,交易日期:todayISO(),交易渠道:'在线支付',交易金额:1000,清算金额:1000,手续费:0,团队:'',业务校区:'',学生姓名:st.name,学员编号:st.code,学生年级:st.grade,现金:'',转账:'',刷卡:'',在线支付:1000,单据编号:'',客户账号:'',类型:'预收学费'});
+})();
+
+// ============ 剩余学费派生（单一真相源：出纳表/课耗表实时交易） ============
+// 剩余学费 = 累计预收学费(报读) − 累计课耗 − 累计预收退款(退费)，与学员档案三表合计保持一致
+// 口径与 studentDetailHTML 中 enrollAll/consumeAll/refundAll 完全一致（仅按 学员编号 过滤）
+function studentEnrolled(code){
+  return cashData.filter(r=> r['学员编号']===code && r['类型']==='预收学费')
+    .reduce((a,r)=>a + (parseFloat(r['交易金额'])||0), 0);
+}
+function studentConsumeAmt(code){
+  return consumeData.filter(r=> r['学员编号']===code)
+    .reduce((a,r)=>a + (parseFloat(r['课耗金额']!=null && r['课耗金额']!=='' ? r['课耗金额'] : r['amt'])||0), 0);
+}
+function studentRefundAmt(code){
+  return cashData.filter(r=> r['学员编号']===code && r['类型']==='预收退款')
+    .reduce((a,r)=>a + (parseFloat(r['交易金额'])||0), 0);
+}
+function studentRemain(code){
+  return Math.round((studentEnrolled(code) - studentConsumeAmt(code) - studentRefundAmt(code))*100)/100;
+}
+
+// ============ 账户表（剩余学费的镜像，按 学员编号 + 公司 + 年月；本月剩余 由交易实时派生） ============
+const ACCOUNT_FIELDS=['年月','公司名称','纳税人识别号','类型','学员编号','学生姓名','学生年级','上月剩余','应付','转出','预收','退款','理赔','课耗','本月剩余'];
+const CONSUME_FIELDS=['年月','公司名称','纳税人识别号','考勤日期','学生姓名','学员编号','学生年级','课耗金额','消耗课时','课时长度','课程名称','课程类型','课程子类型','课程年级','科目','课程季','上课日期','上课时间','教师','教师编码'];
+// 课耗表原始数据使用英文键，导出时映射回模板中文表头（与导入模板三表表头一致）
+function consumeRowToArr(r){
+  const ctax = r['纳税人识别号'] || (function(){
+    const comp = companies.find(c=>c.name===r.company || c.tax===r.company);
+    return comp ? comp.tax : '';
+  })();
+  const num = v => (v==null || v==='') ? '' : v;
+  return [
+    r['年月'] || (r.date||'').slice(0,7),                  // 年月
+    r['公司名称'] || r.company || '',                      // 公司名称
+    ctax,                                                  // 纳税人识别号
+    r['考勤日期'] || r.date || '',                         // 考勤日期
+    r['学生姓名'] || r.name || '',                         // 学生姓名
+    r['学员编号'] || '',                                   // 学员编号
+    r['学生年级'] || r.grade || '',                        // 学生年级
+    num(r['课耗金额']!=null && r['课耗金额']!=='' ? r['课耗金额'] : r.amt), // 课耗金额
+    num(r['消耗课时']),                                    // 消耗课时
+    num(r['课时长度']),                                    // 课时长度
+    r['课程名称'] || '',                                   // 课程名称
+    r['课程类型'] || '',                                   // 课程类型
+    r['课程子类型'] || '',                                 // 课程子类型
+    r['课程年级'] || r.grade || '',                        // 课程年级
+    r['科目'] || r.subject || '',                          // 科目
+    r['课程季'] || '',                                     // 课程季
+    r['上课日期'] || r.date || '',                         // 上课日期
+    r['上课时间'] || '',                                   // 上课时间
+    r['教师'] || '',                                      // 教师
+    r['教师编码'] || ''                                    // 教师编码
+  ];
+}
+const accountData=[];
+function genAccountMock(month){
+  const y=2026, mm=String(month).padStart(2,'0'), ym=`${y}-${mm}`;
+  const comp=companies[0]||{name:'快乐智豪厦门文化有限公司',tax:'91350200MA8R5X2X9K'};
+  const arr=[];
+  const isLatest = month===7; // 7 月为最新月份，本月剩余 = 该学员当前剩余学费（由交易派生）
+  students.forEach(st=>{
+    const enrolled=studentEnrolled(st.code);
+    const consume=studentConsumeAmt(st.code);
+    const refund=studentRefundAmt(st.code);
+    const rem=studentRemain(st.code);
+    arr.push({
+      年月:ym, 公司名称:comp.name, 纳税人识别号:comp.tax, 类型:'预收学费',
+      学员编号:st.code, 学生姓名:st.name, 学生年级:st.grade,
+      上月剩余: isLatest?0:rem, 应付:'', 转出:'',
+      预收: isLatest?enrolled:'',
+      退款: isLatest?refund:'',
+      理赔:'',
+      课耗: isLatest?consume:'',
+      本月剩余: rem
+    });
+  });
+  return arr;
+}
+// 初始预置 6、7 月账户数据：7 月为最新月份，本月剩余 = 该学员当前剩余学费（演示用）
+[6,7].forEach(m=>genAccountMock(m).forEach(r=>accountData.push(r)));
+
+// ============ 原excel数据快照（按月份固化「导入当时」的三表数据，供按月份视图下载回放；不含会话内后续报名/考勤写入） ============
+const monthSource = {};
+function snapshotMonth(m){
+  const mm=String(m).padStart(2,'0'), ym=`2026-${mm}`;
+  monthSource[ym] = {
+    account: accountData.filter(r=>r['年月']===ym).map(r=>ACCOUNT_FIELDS.map(k=>r[k])),
+    cash: cashData.filter(r=>r['年月']===ym).map(r=>CASH_FIELDS.map(k=>r[k])),
+    consume: consumeData.filter(r=>(r.date||'').slice(0,7)===ym).map(consumeRowToArr)
+  };
+}
+// 初始化：对当前已有数据的月份固化快照（代表导入时的原excel数据）
+(function(){
+  const months=new Set();
+  accountData.forEach(r=>months.add((r['年月']||'').slice(5,7)));
+  cashData.forEach(r=>months.add((r['年月']||'').slice(5,7)));
+  consumeData.forEach(r=>months.add((r.date||'').slice(5,7)));
+  months.forEach(m=>{ if(m) snapshotMonth(parseInt(m,10)); });
+})();
+
+// 新生报名编码：XYBH_ + 当天日期(YYYYMMDD) + 100000 起顺序自增（6 位）
+let enrollSeq=0;
+function nextEnrollCode(){
+  const d=new Date();
+  const ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  return `XYBH_${ds}${String(100000+enrollSeq).padStart(6,'0')}`;
+}
+const GRADES=['幼儿园小班','幼儿园中班','幼儿园大班','一年级','二年级','三年级','四年级','五年级','六年级','初一','初二','初三','高一','高二','高三'];
+const SUBJECTS=['语文','数学','英语','物理','化学','生物','政治','历史','地理'];
+
+/* ============ 状态 ============ */
+const state = {
+  side:'home', adminRoute:'company', adminSearch:'', adminPage:1, adminSize:10,
+  dataTab:'month', dataYear:2026,
+  loggedIn:null, companyRoute:'profile',
+  showSearch:false, searchText:'', searchResults:null,
+  selectedStudent:null,
+  liPage:{enroll:1, consume:1, refund:1},
+  liSize:{enroll:10, consume:10, refund:10},
+  liFilter:defaultLiFilter(),
+  profileTab:'enroll',
+  enrollCtx:{mode:'new'},
+  perf:{sortCol:'date',sortDir:'desc',page:1,size:10,start:'2026-08-01',end:'2026-08-31'},
+  cons:{sortCol:'date',sortDir:'desc',page:1,size:10,start:'2026-08-01',end:'2026-08-31'},
+};
+
+/* ============ 工具 ============ */
+function money(n){return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// 学员编码脱敏：字面第5–9位（1-based，含下划线）打码，仅用于显示层；底层数据不受影响
+function maskCode(c){const s=String(c==null?'':c);const a=s.split('');for(let i=4;i<=8&&i<a.length;i++)a[i]='*';return a.join('');}
+const ICON={
+  landmark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="21" x2="21" y2="21"/><line x1="3" y1="10" x2="21" y2="10"/><polygon points="12 2 22 10 2 10"/><line x1="6" y1="10" x2="6" y2="21"/><line x1="12" y1="10" x2="12" y2="21"/><line x1="18" y1="10" x2="18" y2="21"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  building:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16"/><path d="M14 21V9h4a1 1 0 0 1 1 1v11"/><path d="M8 7h2M8 11h2M8 15h2"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  trendingUp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m23 6-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>',
+  barChart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  grad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/></svg>',
+  yuan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 8l3 3 3-3"/><path d="M12 11v5"/><path d="M9.5 13h5"/><path d="M9.5 15.5h5"/></svg>',
+  fileText:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>',
+  excel:'<svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#excelClip)"><path d="M63.6136 0.446839C52.577 0.446839 41.9924 4.83111 34.1883 12.6352C26.3843 20.4392 22 31.0238 22 42.0604V214.387C22 225.423 26.3843 236.008 34.1883 243.812C41.9924 251.616 52.577 256 63.6136 256H193.369C204.405 256 214.99 251.616 222.794 243.812C230.598 236.008 234.982 225.423 234.982 214.387V86.0355C234.943 81.8478 233.271 77.8407 230.323 74.8662L160.499 5.0422C159.031 3.57967 157.289 2.421 155.372 1.63248C153.455 0.843954 151.402 0.441058 149.33 0.446839H63.6136Z" fill="#41CC8B"/><path d="M230.544 74.8662L160.72 5.04222C158.51 2.84636 155.682 1.37686 152.615 0.8298C152.393 0.792347 152.166 0.804045 151.95 0.864066C151.733 0.924086 151.533 1.03096 151.362 1.17712C151.192 1.32327 151.055 1.50514 150.963 1.70983C150.871 1.91452 150.824 2.13703 150.827 2.36159V36.1247C150.827 42.5222 152.09 48.8569 154.542 54.7658C156.994 60.6747 160.588 66.0418 165.117 70.5596C169.647 75.0773 175.023 78.6571 180.939 81.0936C186.854 83.5302 193.192 84.7758 199.589 84.759H233.353C233.579 84.7606 233.804 84.714 234.011 84.6221C234.218 84.5302 234.403 84.3952 234.554 84.2261C234.705 84.057 234.818 83.8577 234.886 83.6415C234.954 83.4252 234.975 83.1969 234.948 82.9719C234.314 79.894 232.781 77.0733 230.544 74.8662Z" fill="#05B25F"/><path d="M201.185 76.9723H232.268C231.764 76.2151 231.187 75.5096 230.544 74.8661L160.72 5.04211C160.077 4.39963 159.371 3.8224 158.614 3.31885V34.4014C158.614 45.6919 163.099 56.52 171.083 64.5036C179.066 72.4872 189.895 76.9723 201.185 76.9723Z" fill="#B0F9D7"/><path d="M49 105.395H78.2705V112.479H58.1909V122.431H74.9922V129.631H58.1909V141.34H78.6803V148.54H49V105.395ZM94.6035 131.388L84.1246 115.933H94.2522L97.8232 121.787C98.877 123.66 99.9307 125.475 100.984 127.231L102.272 124.538L103.853 121.787L106.839 115.933H116.732L106.253 132.5L117.434 148.423H107.19L103.209 142.569L101.511 139.349L99.7551 136.539L97.9989 139.349L96.4768 142.276L93.1399 148.13H83.4221L94.6035 131.388ZM126.099 144.676C124.428 143.06 123.121 141.108 122.263 138.948C121.405 136.788 121.016 134.47 121.123 132.149C121.034 129.76 121.476 127.382 122.418 125.185C123.359 122.989 124.776 121.028 126.567 119.445C130.138 116.46 134.675 114.878 139.329 114.996C143.114 114.984 146.79 116.265 149.749 118.626L145.3 124.129C143.771 122.792 141.827 122.027 139.797 121.962C138.564 121.915 137.336 122.142 136.202 122.628C135.068 123.114 134.056 123.847 133.241 124.772C131.452 126.801 130.528 129.448 130.665 132.149C130.546 134.783 131.447 137.363 133.182 139.349C133.979 140.247 134.964 140.959 136.066 141.435C137.169 141.91 138.363 142.137 139.563 142.101C142.124 141.971 144.571 141.004 146.529 139.349L150.217 145.203C146.893 147.839 142.75 149.227 138.509 149.126C133.952 149.31 129.501 147.715 126.099 144.676ZM159.935 144.618C158.209 143.046 156.848 141.115 155.947 138.961C155.047 136.807 154.63 134.481 154.725 132.149C154.655 129.812 155.072 127.487 155.949 125.32C156.825 123.153 158.143 121.193 159.818 119.562C161.373 118.068 163.208 116.896 165.217 116.113C167.226 115.329 169.37 114.95 171.526 114.996C173.596 114.884 175.665 115.218 177.595 115.975C179.524 116.733 181.268 117.896 182.708 119.387C185.305 122.517 186.642 126.504 186.454 130.568C186.497 131.872 186.339 133.175 185.986 134.432H163.858C164.151 136.734 165.326 138.833 167.136 140.286C169.021 141.75 171.366 142.497 173.751 142.393C176.581 142.367 179.351 141.578 181.771 140.11L184.991 145.379C181.237 147.73 176.893 148.968 172.463 148.95C167.886 149.167 163.401 147.616 159.935 144.618ZM178.317 128.812C178.317 124.011 176.034 121.611 171.526 121.611C169.68 121.565 167.884 122.212 166.492 123.426C164.94 124.819 163.96 126.738 163.74 128.812H178.317ZM194.065 139.349V102H203.373V139.349C203.342 139.707 203.383 140.068 203.494 140.409C203.604 140.751 203.782 141.068 204.017 141.34C204.171 141.53 204.368 141.683 204.591 141.784C204.815 141.886 205.059 141.934 205.305 141.925H206.592L207.705 148.247C206.146 148.797 204.498 149.055 202.846 149.008C196.992 149.126 194.065 145.847 194.065 139.349Z" fill="#F5F6FA"/></g><defs><clipPath id="excelClip"><rect width="256" height="256" fill="white"/></clipPath></defs></svg>',
+  refund:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
+  arrowLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
+  logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  upload:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  arrowLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+  arrowRight:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+};
+function toast(msg,type){const t=document.createElement('div');t.className='toast '+(type||'');t.innerHTML=(type==='ok'?'<span class="i">'+ICON.check+'</span>':'<span class="i">'+ICON.x+'</span>')+esc(msg);document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+
+function todayISO(){const d=new Date();const m=String(d.getMonth()+1).padStart(2,'0');return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2,'0')}`;}
+function monthRange(){const d=new Date();const y=d.getFullYear(),mo=d.getMonth();const first=`${y}-${String(mo+1).padStart(2,'0')}-01`;const last=new Date(y,mo+1,0).getDate();return {start:first,end:`${y}-${String(mo+1).padStart(2,'0')}-${String(last).padStart(2,'0')}`};}
+function defaultLiFilter(){
+  const edge=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const t=new Date(), s=new Date(t); s.setDate(s.getDate()-90);
+  const r={start:edge(s), end:edge(t)};
+  return {enroll:{...r}, consume:{...r}, refund:{...r}};
+}
+
+function paginationHTML(kind, total, page, pages){
+  let pgs='';
+  const win=2;
+  let s=Math.max(1,page-win), e=Math.min(pages,page+win);
+  if(s>1){pgs+=`<button class="page-btn" data-action="report-page" data-kind="${kind}" data-page="1">1</button>`;if(s>2)pgs+=`<span class="muted">…</span>`;}
+  for(let i=s;i<=e;i++){
+    pgs+=`<button class="page-btn ${i===page?'active':''}" data-action="report-page" data-kind="${kind}" data-page="${i}">${i}</button>`;
+  }
+  if(e<pages){if(e<pages-1)pgs+=`<span class="muted">…</span>`;pgs+=`<button class="page-btn" data-action="report-page" data-kind="${kind}" data-page="${pages}">${pages}</button>`;}
+  const size = state[kind].size;
+  return `<div class="pagination">
+    <div class="info">共 <b>${total}</b> 条记录，${pageSizeCtrl(kind,size)}，共 ${page}/${pages} 页</div>
+    <div class="pages">
+      <button class="page-btn arrow" data-action="report-page" data-kind="${kind}" data-page="${page-1}" ${page<=1?'disabled':''}>‹ 上一页</button>
+      ${pgs}
+      <button class="page-btn arrow" data-action="report-page" data-kind="${kind}" data-page="${page+1}" ${page>=pages?'disabled':''}>下一页 ›</button>
+    </div>
+  </div>`;
+}
+
+function detailPaginationHTML(kind, total, page, pages, size){
+  let pgs=''; const win=2;
+  let s=Math.max(1,page-win), e=Math.min(pages,page+win);
+  if(s>1){pgs+=`<button class="page-btn" data-action="detail-page" data-kind="${kind}" data-page="1">1</button>`;if(s>2)pgs+=`<span class="muted">…</span>`;}
+  for(let i=s;i<=e;i++){
+    pgs+=`<button class="page-btn ${i===page?'active':''}" data-action="detail-page" data-kind="${kind}" data-page="${i}">${i}</button>`;
+  }
+  if(e<pages){if(e<pages-1)pgs+=`<span class="muted">…</span>`;pgs+=`<button class="page-btn" data-action="detail-page" data-kind="${kind}" data-page="${pages}">${pages}</button>`;}
+  return `<div class="pagination">
+    <div class="info">共 <b>${total}</b> 条记录，${pageSizeCtrl(kind,size)}，共 ${page}/${pages} 页</div>
+    <div class="pages">
+      <button class="page-btn arrow" data-action="detail-page" data-kind="${kind}" data-page="${page-1}" ${page<=1?'disabled':''}>‹ 上一页</button>
+      ${pgs}
+      <button class="page-btn arrow" data-action="detail-page" data-kind="${kind}" data-page="${page+1}" ${page>=pages?'disabled':''}>下一页 ›</button>
+    </div>
+  </div>`;
+}
+
+// 每页条数下拉（10/20/50/100），kind 对应各分页器：admin / perf / cons / enroll / consume / refund
+function pageSizeCtrl(kind, size){
+  const opts=[10,20,50,100].map(n=>`<option value="${n}"${n===size?' selected':''}>${n} 条/页</option>`).join('');
+  return `<span class="page-size-wrap">每页<select class="page-size" id="${kind}-size">${opts}</select></span>`;
+}
+
+/* ============ 顶部导航 ============ */
+function topNavHTML(opts){
+  const {title, rightBadge, rightAccount, rightLogout, menu} = opts || {};
+  const menuHTML = menu ? `<nav class="nav-menu">${menu.map(m=>`<button class="nav-item ${m.active?'active':''}" data-action="${m.action}"${m.route?` data-route="${m.route}"`:''}>${esc(m.label)}</button>`).join('')}</nav>` : '';
+  return `<div class="top-nav">
+    <span class="title">${esc(title||'')}</span>
+    ${menuHTML}
+    <span class="spacer"></span>
+    ${rightBadge ? `<span class="company-badge"><span class="i">${ICON.building}</span>${esc(rightBadge)}</span>` : ''}
+    ${rightAccount ? `<span class="account-badge"><span class="i">${ICON.user}</span>${esc(rightAccount)}</span>` : ''}
+    ${rightLogout ? `<button class="logout" data-action="${rightLogout.action}"><span class="i">${rightLogout.icon||ICON.logout}</span>${rightLogout.label||'退出登录'}</button>` : ''}
+  </div>`;
+}
+
+/* ============ 渲染：首页 ============ */
+function homeHTML(){
+  return `<div class="home-page">
+    <div class="home-logo">${ICON.landmark}</div>
+    <div class="home-title">财务 ERP 系统</div>
+    <div class="home-sub">前端交互原型 · 请选择进入端口</div>
+    <div class="entry-grid">
+      <div class="entry admin" data-action="nav-admin">
+        <div class="ico">${ICON.gear}</div>
+        <h3>管理端</h3>
+        <p>公司管理、数据管理</p>
+      </div>
+      <div class="entry company" data-action="nav-company">
+        <div class="ico">${ICON.building}</div>
+        <h3>公司端</h3>
+        <p>学员档案、业绩报表<br/>课耗报表</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============ 渲染：管理端框架 ============ */
+function adminFrameHTML(){
+  const content = state.adminRoute==='company' ? adminCompanyHTML() : adminDataHTML();
+  const menu=[
+    {action:'admin-nav', route:'company', label:'公司管理', active:state.adminRoute==='company'},
+    {action:'admin-nav', route:'data', label:'数据管理', active:state.adminRoute==='data'},
+  ];
+  return `<div>
+    ${topNavHTML({
+      title:'管理端',
+      menu,
+      rightBadge:'管理员',
+      rightLogout:{label:'退出', action:'back-home'},
+    })}
+    <div class="page">${content}</div>
+  </div>`;
+}
+
+function adminCompanyHTML(){
+  const q=state.adminSearch.trim().toLowerCase();
+  const list = companies.filter(c=> !q || c.tax.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+  const pageSize=state.adminSize;
+  const total=list.length;
+  const pages=Math.max(1,Math.ceil(total/pageSize));
+  const page=Math.min(Math.max(1,state.adminPage),pages);
+  const pageRows=list.slice((page-1)*pageSize, page*pageSize);
+  const rows = pageRows.map(c=>{
+    const st=deriveStatus(c);
+    return `<tr>
+      <td class="col-id">${c.id}</td>
+      <td class="col-tax" title="${esc(c.tax)}">${esc(c.tax)}</td>
+      <td class="col-name" title="${esc(c.name)}">${esc(c.name)}</td>
+      <td class="col-account">${esc(c.account)||'-'}</td>
+      <td class="num col-pwd pwd-cell"><span class="pwd-text">••••••</span><button type="button" class="pwd-eye" data-action="toggle-pwd" data-pwd="${esc(c.pwd)}" aria-label="显示密码">${ICON.eye}</button></td>
+      <td class="col-status"><span class="status-dot ${st==='存续'?'dot-blue':'dot-gray'}"></span>${esc(st)}</td>
+      <td class="col-found">${esc(c.found)}</td>
+      <td class="col-cancel">${esc(c.cancel)||'-'}</td>
+      <td class="col-op"><button class="btn-link" data-action="edit-company" data-id="${c.id}"><span class="i">${ICON.edit}</span>编辑</button></td>
+    </tr>`;
+  }).join('');
+  let pgs=''; const win=2;
+  let s0=Math.max(1,page-win), e0=Math.min(pages,page+win);
+  if(s0>1){pgs+=`<button class="page-btn" data-action="admin-page" data-page="1">1</button>`;if(s0>2)pgs+=`<span class="muted">…</span>`;}
+  for(let i=s0;i<=e0;i++){pgs+=`<button class="page-btn ${i===page?'active':''}" data-action="admin-page" data-page="${i}">${i}</button>`;}
+  if(e0<pages){if(e0<pages-1)pgs+=`<span class="muted">…</span>`;pgs+=`<button class="page-btn" data-action="admin-page" data-page="${pages}">${pages}</button>`;}
+  const pager = total>0 ? `<div class="pagination">
+    <div class="info">共 <b>${total}</b> 条记录，${pageSizeCtrl('admin',pageSize)}，共 ${page}/${pages} 页</div>
+    <div class="pages">
+      <button class="page-btn arrow" data-action="admin-page" data-page="${page-1}" ${page<=1?'disabled':''}>‹ 上一页</button>
+      ${pgs}
+      <button class="page-btn arrow" data-action="admin-page" data-page="${page+1}" ${page>=pages?'disabled':''}>下一页 ›</button>
+    </div>
+  </div>` : '';
+  return `<div class="card">
+    <div class="table-toolbar">
+      <input class="input-w" placeholder="纳税人识别号" id="adm-tax" value="${esc(state.adminSearch)}"/>
+      <input class="input-w" placeholder="公司名称" id="adm-name"/>
+      <button class="btn btn-primary btn-sm" data-action="adm-search"><span class="i">${ICON.search}</span>查询</button>
+      <button class="btn btn-secondary btn-sm" data-action="adm-reset">重置</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary btn-sm" data-action="add-company">+ 新增公司</button>
+    </div>
+    <div class="count">共 ${total} 家公司${state.adminSearch?`（已按纳税人识别号/公司名称过滤）`:''}</div>
+    <div class="company-table-wrap">
+      <table>
+        <thead><tr>
+          <th class="col-id">id</th>
+          <th class="col-tax">纳税人识别号</th>
+          <th class="col-name">公司名称</th>
+          <th class="col-account">专用账号</th>
+          <th class="col-pwd">专用密码</th>
+          <th class="col-status">登记状态</th>
+          <th class="col-found">成立日期</th>
+          <th class="col-cancel">注销日期</th>
+          <th class="col-op">操作</th>
+        </tr></thead>
+        <tbody>${rows||'<tr><td colspan="9" class="empty">无匹配公司</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${pager}
+  </div>`;
+}
+
+function adminDataHTML(){
+  if(state.dataTab==='month') return dataMonthHTML();
+  return dataCompanyHTML();
+}
+
+function dataMonthHTML(){
+  const y=state.dataYear;
+  let rows='';
+  for(let m=1;m<=12;m++){
+    const s=monthStatus[m];
+    const op = s ? `<button class="btn btn-secondary btn-sm" data-action="open-upload" data-month="${m}">重新上传</button>`
+                 : `<button class="btn btn-primary btn-sm" data-action="open-upload" data-month="${m}">上传</button>`;
+    const hasData = !!s || cashData.some(r=>r['年月']===`${y}-${String(m).padStart(2,'0')}`);
+    const file = hasData ? `<span class="file-pill" data-action="download-src" data-month="${m}">${ICON.excel}<span class="file-name">${esc(s?s.file:`原excel数据_${y}-${String(m).padStart(2,'0')}.xlsx`)}</span></span>` : '<span class="muted">-</span>';
+    const status = s ? `<span class="status-dot dot-blue"></span>已导入` : `<span class="status-dot dot-gray"></span>未导入`;
+    const up = s ? esc(s.date) : '<span class="muted">-</span>';
+    rows+=`<tr>
+      <td><b>${m}月</b></td>
+      <td>${file}</td>
+      <td>${up}</td>
+      <td>${status}</td>
+      <td>${op}</td>
+    </tr>`;
+  }
+  return `<div class="card">
+    <div class="tabs">
+      <button class="tab active" data-action="data-tab" data-tab="month">按月份</button>
+      <button class="tab" data-action="data-tab" data-tab="company">按公司</button>
+    </div>
+    <div class="filter-bar">
+      <span class="label">查询年份</span>
+      <select id="data-year">${[2024,2025,2026].map(yy=>`<option ${yy===y?'selected':''}>${yy}</option>`).join('')}</select>
+      <span class="spacer"></span>
+      <button class="btn btn-secondary btn-sm" data-action="download-template"><span class="i">${ICON.download}</span>下载导入模板</button>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:80px;">月份</th>
+        <th style="width:170px;">Excel 源文件</th>
+        <th style="width:170px;">上传时间</th>
+        <th style="width:120px;">导入状态</th>
+        <th style="width:140px;">操作</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function dataCompanyHTML(){
+  const y=state.dataYear;
+  const head = Array.from({length:12},(_,i)=>`<th class="num"><div class="cg-h">${i+1}月</div></th>`).join('');
+  const body = companies.map(c=>{
+    let cells='';
+    for(let m=1;m<=12;m++){
+      const ym=`${y}-${String(m).padStart(2,'0')}`;
+      const foundYm=c.found?c.found.slice(0,7):'';
+      const cancelYm=c.cancel?c.cancel.slice(0,7):'';
+      const registered=foundYm && foundYm<=ym;
+      const notCanceled=!cancelYm || cancelYm>=ym;
+      const active=registered && notCanceled;
+      const key=c.id+'-'+m;
+      if(!active) cells+=`<td class="check-cell blank"><div class="cg-c" title="该月未注册或已注销"></div></td>`;
+      else if(companyMonthStatus[key]) cells+=`<td class="check-cell"><div class="cg-c"><span class="ck" title="已导入">${ICON.check}</span></div></td>`;
+      else cells+=`<td class="check-cell empty"><div class="cg-c" title="未导入">○</div></td>`;
+    }
+    return `<tr><td><div class="cg-c"><b>${esc(c.name)}</b></div></td>${cells}</tr>`;
+  }).join('');
+  return `<div class="card">
+    <div class="tabs">
+      <button class="tab" data-action="data-tab" data-tab="month">按月份</button>
+      <button class="tab active" data-action="data-tab" data-tab="company">按公司</button>
+    </div>
+    <div class="filter-bar">
+      <span class="label">查询年份</span>
+      <select id="data-year">${[2024,2025,2026].map(yy=>`<option ${yy===y?'selected':''}>${yy}</option>`).join('')}</select>
+    </div>
+    <div style="padding:18px 24px;background:#fff;">
+      <div class="sticky-grid" style="overflow:auto;max-height:520px;">
+        <table><thead><tr><th><div class="cg-h">公司 ＼ 月份</div></th>${head}</tr></thead><tbody>${body}</tbody></table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============ 渲染：公司端 ============ */
+function loginHTML(){
+  return `${topNavHTML({title:'公司端登录',rightBadge:'公司端',rightLogout:{label:'退出',action:'back-home'}})}
+  <div class="login-page">
+    <div class="login-card">
+      <h2>登录</h2>
+      <label class="f"><span class="lab">公司 <span class="req">*</span></span><input id="login-name" autocomplete="off" placeholder="请输入公司名称" value="快乐智豪厦门文化有限公司"/></label>
+      <label class="f"><span class="lab">账号 <span class="req">*</span></span><input id="login-account" autocomplete="off" maxlength="20" placeholder="请输入账号" value="ZH01"/></label>
+      <label class="f"><span class="lab">密码 <span class="req">*</span></span><span class="login-pwd"><input id="login-pwd" type="password" autocomplete="new-password" placeholder="请输入密码" value="625777"/><button type="button" class="pwd-eye" data-action="toggle-login-pwd" aria-label="显示密码">${ICON.eye}</button></span></label>
+      <button class="btn btn-primary" data-action="do-login">登 录</button>
+    </div>
+  </div>`;
+}
+
+function companyFrameHTML(){
+  const c=state.loggedIn;
+  let content='';
+  if(state.companyRoute==='profile') content = profileHTML();
+  else if(state.companyRoute==='performance') content=reportHTML('perf');
+  else content=reportHTML('cons');
+
+  const menu=[
+    {action:'company-nav', route:'profile', label:'学员档案', active:state.companyRoute==='profile'},
+    {action:'company-nav', route:'performance', label:'业绩报表', active:state.companyRoute==='performance'},
+    {action:'company-nav', route:'cons', label:'课耗报表', active:state.companyRoute==='cons'},
+  ];
+  return `<div>
+    ${topNavHTML({
+      title:'公司端',
+      menu,
+      rightBadge: c ? c.name : '',
+      rightAccount: c ? c.account : '',
+      rightLogout:{label:'退出登录', action:'logout'},
+    })}
+    <div class="page">${content}</div>
+  </div>`;
+}
+
+function profileHTML(){
+  const results = state.searchResults;
+  let below;
+  if(state.selectedStudent){
+    below = studentDetailHTML(state.selectedStudent);
+  } else if(results===null){
+    below = '';
+  } else if(results.length===0){
+    below = `<div class="profile-list-wrap"><div class="card"><div class="enroll-hint" style="padding:56px 0;">找不到学生？去 <button class="link-btn" data-action="open-enroll">新生报名</button></div></div></div>`;
+  } else {
+    below = `<div class="profile-list-wrap"><div class="card" style="margin-top:16px;">
+      <div class="count">共 ${results.length} 条</div>
+      <table>
+        <thead><tr><th>学员编号</th><th>学员姓名</th><th style="width:56px;"></th></tr></thead>
+        <tbody>${results.map(s=>`<tr data-action="open-detail" data-code="${s.code}" style="cursor:pointer">
+          <td><span class="muted" style="font-size:13px;">${esc(maskCode(s.code))}</span></td>
+          <td>${esc(s.name)}</td>
+          <td style="text-align:right;color:var(--primary);font-size:18px;">›</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div></div>`;
+  }
+  const searchBox = state.selectedStudent ? '' : `<div class="search-hero">
+    <img class="hero-logo" alt="学员查询" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTA5IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMTA5IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZyBvcGFjaXR5PSIwLjIzNjQ0NCIgZmlsdGVyPSJ1cmwoI2ZpbHRlcjBfZl8zMjUyXzEyMDY3KSI+CjxwYXRoIGQ9Ik01NC4zMDQ3IDE2QzgwLjM3MjEgMTYgMTAxLjUwNCAxNS41NTIzIDEwMS41MDQgMTVDMTAxLjUwNCAxNC40NDc3IDgwLjM3MjEgMTQgNTQuMzA0NyAxNEMyOC4yMzc0IDE0IDcuMTA1NTkgMTQuNDQ3NyA3LjEwNTU5IDE1QzcuMTA1NTkgMTUuNTUyMyAyOC4yMzc0IDE2IDU0LjMwNDcgMTZaIiBmaWxsPSIjMTU3Q0ZGIi8+CjwvZz4KPHBhdGggZD0iTTI5Ljc2NDMgMTUuNTM2QzMwLjE4MDMgMTUuNTM2IDMwLjU5NjMgMTUuNTIgMzEuMDEyMyAxNS41MzZDMzEuNDQ0MyAxNS41NTIgMzEuNjY4MyAxNS4yNDggMzEuNjg0MyAxNC45NDRDMzEuNzAwMyAxNC41NiAzMS43MDAzIDE0LjE3NiAzMS43MDAzIDEzLjc5MlYxMy40ODhIMjUuOTU2M1YxMi4wMzJIMzEuNjg0M1YxMS43MTJDMzIuNDg0MyAxMS4zNiAzMy4xODgzIDEwLjgxNiAzMy44NzYzIDEwLjI3MkgyOC4yNzYzVjguODMySDM2LjQ4NDNWMTAuMjU2QzM1LjgxMjMgMTAuOTEyIDM1LjA2MDMgMTEuNDg4IDM0LjI0NDMgMTJDMzQuMjYwMyAxMiAzNC4yNjAzIDEyLjAxNiAzNC4yNDQzIDEyLjAzMkgzNy42MjAzQzM4LjUwMDMgMTIuMDMyIDM4LjU5NjMgMTIuMDE2IDM4Ljg1MjMgMTEuOTM2VjEzLjM3NkMzOC44NTIzIDEzLjM3NiAzOC43MDgzIDEzLjQ4OCAzOC4xMTYzIDEzLjQ4OEgzMy43MDAzVjE0LjA5NkMzMy42ODQzIDE0LjUyOCAzMy43MDAzIDE0Ljk2IDMzLjY1MjMgMTUuMzc2QzMzLjU3MjMgMTYuMzIgMzIuODg0MyAxNy4wMDggMzEuOTQwMyAxNy4xNTJDMzEuNzMyMyAxNy4xNjggMzEuNTQwMyAxNy4xNTIgMzEuMzMyMyAxNy4xNTJIMjkuNjA0M1YxNS41MzZIMjkuNzY0M1pNMzQuOTk2MyA2LjEyOEMzNS4zODAzIDUuNDQgMzUuNTU2MyA0LjcwNCAzNS43MTYzIDMuOTUySDM3Ljc4MDNDMzcuNjIwMyA0LjcwNCAzNy4zODAzIDUuNDA4IDM3LjA0NDMgNi4xMTJIMzcuNTA4M0MzOC4yNjAzIDYuMDk2IDM4Ljg1MjMgNi43MiAzOC44NTIzIDcuMzc2QzM4Ljg2ODMgNy44MjQgMzguODUyMyA4LjI4OCAzOC44NTIzIDguNzUyVjguOTI4SDM2Ljk2NDNDMzYuOTY0MyA4Ljc4NCAzNi45NjQzIDguNjQgMzYuOTQ4MyA4LjQ5NkMzNi45NDgzIDguMzg0IDM2Ljk0ODMgOC4yNzIgMzYuOTMyMyA4LjE0NEMzNi45MDAzIDcuODQgMzYuNjQ0MyA3LjYxNiAzNi4zMjQzIDcuNjE2SDI3Ljg2MDNWOC45MjhIMjUuOTU2M1Y2LjEyOEgzNC45OTYzWk0yOC45NDgzIDMuOTY4QzI5LjE0MDMgNC41NDQgMjkuMzQ4MyA1LjEzNiAyOS41NTYzIDUuNzI4SDI3LjQ3NjNDMjcuMjg0MyA1LjE1MiAyNy4xMDgzIDQuNTYgMjYuOTE2MyAzLjk2OEgyOC45NDgzWk0zMi45MTYzIDMuOTUyTDMzLjQ5MjMgNS43MjhIMzEuNDI4M0wzMC45MDAzIDMuOTUySDMyLjkxNjNaTTQwLjQ1NjMgMTUuNDA4QzQwLjcxMjIgMTUuMzc2IDQwLjk1MjMgMTUuMzQ0IDQxLjIwODMgMTUuMjk2QzQyLjI5NjMgMTUuMTA0IDQzLjMzNjMgMTQuNzY4IDQ0LjI4MDMgMTQuMTc2QzQ0Ljk1MjMgMTMuNzI4IDQ1LjQ5NjMgMTMuMTY4IDQ1LjcwNDMgMTIuMzUyQzQ1Ljc1MjMgMTIuMTYgNDUuNzg0MyAxMS45NjggNDUuNzg0MyAxMS43NzZDNDUuODAwMyAxMS41MzYgNDUuNzg0MyAxMS4yOTYgNDUuNzg0MyAxMS4wNEg0Ny43ODQzQzQ3Ljc4NDMgMTEuMjMyIDQ3Ljc2ODMgMTEuNDI0IDQ3Ljc4NDMgMTEuNkM0Ny44MDAzIDExLjg1NiA0Ny44MDAzIDEyLjExMiA0Ny44NDgzIDEyLjM1MkM0Ny45NzYzIDEyLjg4IDQ4LjI5NjMgMTMuMjk2IDQ4LjY5NjIgMTMuNjhDNDkuMzg0MyAxNC4zMzYgNTAuMjMyMyAxNC43MiA1MS4xNDQzIDE0Ljk5MkM1MS41NjAzIDE1LjEyIDUxLjk5MjMgMTUuMjE2IDUyLjQyNDMgMTUuMzEyQzUyLjU4NDMgMTUuMzQ0IDUzLjA0ODMgMTUuMzkyIDUzLjEyODMgMTUuNDA4VjE3LjA0SDUyLjg4ODNDNTIuMDU2MyAxNi45NDQgNTEuMjQwMyAxNi44MTYgNTAuNDU2MyAxNi41NzZDNDkuNzA0MyAxNi4zNTIgNDguOTg0MyAxNi4wOTYgNDguMzI4MyAxNS42OEM0Ny43ODQzIDE1LjM0NCA0Ny4zMjAzIDE0LjkyOCA0Ni44ODgzIDE0LjQ2NEw0Ni43OTIzIDE0LjM2OEM0Ni43NjAzIDE0LjQzMiA0Ni43MTIzIDE0LjQ4IDQ2LjY4MDMgMTQuNTEyQzQ1Ljg5NjMgMTUuNDQgNDQuODcyMyAxNiA0My43NjgyIDE2LjQxNkM0My4wNjQzIDE2LjY3MiA0Mi4zNDQzIDE2LjgzMiA0MS42MDgzIDE2Ljk0NEM0MS4yMjQzIDE2Ljk5MiA0MC44NTYzIDE3LjAyNCA0MC40NTYzIDE3LjA1NlYxNS40MDhaTTQxLjMwNDMgOS4wMjRDNDQuNTUyMyA5LjAyNCA0Ny44MDAzIDkuMDI0IDUxLjA0ODMgOS4wNEM1MS4yMDgzIDkuMDQgNTEuMzUyMyA5LjA3MiA1MS40OTYzIDkuMTJDNTEuOTc2MyA5LjMyOCA1Mi40NDAzIDkuODU2IDUyLjQyNDMgMTAuNDk2VjE0LjA0OEg1MC40NDAzQzUwLjQ0MDMgMTMuMjggNTAuNDU2MyAxMi41NDQgNTAuNDQwMyAxMS44MDhWMTEuMTY4QzUwLjQyNDMgMTAuNzg0IDUwLjEzNjMgMTAuNTEyIDQ5Ljc2ODMgMTAuNDhINDMuMDk2M1YxNC4wNDhINDEuMTQ0M1Y5LjAyNEg0MS4zMDQzWk00MS42NzIzIDQuMDY0SDUxLjkyODNWNi43NjhDNTEuOTI4MyA3LjUyIDUxLjMyMDMgOC4wOCA1MC43NDQzIDguMTkyQzUwLjU4NDMgOC4yMjQgNTAuNDQwMyA4LjI0IDUwLjI4MDMgOC4yNEg0MS42NzIzVjQuMDY0Wk00OS41MTIzIDYuODMyQzQ5Ljc1MjMgNi44IDQ5Ljk3NjMgNi42NCA1MC4wMDgzIDYuNDMyQzUwLjA3MjMgNi4xMTIgNTAuMDA4MyA1Ljc5MiA1MC4wMjQzIDUuNDcySDQzLjU5MjNWNi44MzJINDkuNTEyM1pNNTUuODczOSAxMC4wOTZDNTUuNjgxOSAxMC4xNiA1NS40NzM5IDEwLjIyNCA1NS4yMzM5IDEwLjI4OEw1NC43MjE5IDEwLjQxNlY4LjY4OEw1NS4wODk5IDguNTZDNTUuMzI5OSA4LjQ5NiA1NS41Njk5IDguNCA1NS44MjU5IDguMjcyQzU2LjA0OTkgOC4xNiA1Ni4yODk5IDguMDE2IDU2LjU0NTkgNy44NTZDNTYuNzY5OSA3LjcxMiA1Ny4wMDk5IDcuNTA0IDU3LjI2NTkgNy4yNjRDNTcuNTA1OSA3LjAyNCA1Ny42ODE5IDYuODMyIDU3Ljc5MzkgNi42NzJMNTcuOTg1OSA2LjQ0OEg1NC45OTM5VjUuMDA4SDYwLjE3NzlWNEg2Mi4wNDk5VjUuMDA4SDY2LjAxNzlDNjYuODk3OSA1LjAwOCA2Ni45OTM5IDQuOTkyIDY3LjI0OTkgNC45MTJWNi4zMzZDNjcuMjQ5OSA2LjMzNiA2Ny4xMDU5IDYuNDQ4IDY2LjQ5NzkgNi40NDhINjQuMjI1OUw2NC40MDE5IDYuNjg4QzY0LjUyOTkgNi44MzIgNjQuNzA1OSA3LjAyNCA2NC45Mjk5IDcuMjQ4QzY1LjE2OTkgNy40NzIgNjUuMzkzOSA3LjY0OCA2NS42MDE5IDcuNzkyQzY1Ljc5MzkgNy45MzYgNjYuMDY1OSA4LjA4IDY2LjQxNzkgOC4yNTZDNjYuNzUzOSA4LjQxNiA2Ni45OTM5IDguNTI4IDY3LjE2OTkgOC41OTJMNjcuMzkzOSA4LjcwNFYxMC40QzY3LjM5MzkgMTAuNCA2Ny4xMzc5IDEwLjM2OCA2Ni44NjU5IDEwLjI3MkM2Ni41OTM5IDEwLjE5MiA2Ni4zNjk5IDEwLjExMiA2Ni4yMDk5IDEwLjA0OEw2NS45ODU5IDkuOTUyVjEzLjM3NkM2NS45ODU5IDE0LjE2IDY1LjMyOTkgMTQuODE2IDY0LjU0NTkgMTQuODE2SDU2LjA0OTlWMTAuMDMyTDU1Ljg3MzkgMTAuMDk2Wk02Ni4xNDU5IDE1LjY4QzY3LjAyNTkgMTUuNjggNjcuMTIxOSAxNS42NjQgNjcuMzYxOSAxNS41ODRWMTcuMDA4QzY3LjM2MTkgMTcuMDA4IDY3LjIzMzkgMTcuMTIgNjYuNjI1OSAxNy4xMkg1NC43NTM5VjE1LjY4SDY2LjE0NTlaTTYzLjQ1NzkgMTMuMzc2QzYzLjg0MTkgMTMuMzc2IDY0LjE3NzkgMTMuMDQgNjQuMTc3OSAxMi42NTZWMTIuNTQ0SDU3LjkyMTlWMTMuMzc2SDYzLjQ1NzlaTTY0LjE2MTkgMTEuMDcyQzY0LjE2MTkgMTAuNjg4IDYzLjgyNTkgMTAuMzUyIDYzLjQ0MTkgMTAuMzUySDU3LjkyMTlWMTEuMjY0TDY0LjE2MTkgMTEuMjQ4VjExLjA3MlpNNjEuMDczOSA4LjkxMkM2My4xMjE5IDguOTEyIDY0LjE0NTkgOC45MTIgNjQuMTQ1OSA4Ljg5Nkw2My43NDU5IDguNTEyQzYzLjQ3MzkgOC4yNCA2My4yNjU5IDguMDE2IDYzLjEwNTkgNy44MjRDNjIuOTI5OSA3LjYgNjIuNzg1OSA3LjQwOCA2Mi42ODk5IDcuMjMyQzYyLjU0NTkgNy4wNCA2Mi40MzM5IDYuODY0IDYyLjM1MzkgNi43MkM2Mi4yODk5IDYuNjA4IDYyLjE5MzkgNi41MTIgNjIuMTEzOSA2LjQ0OEg2Mi4wNDk5VjguNTQ0SDYwLjE3NzlWNi40NDhINjAuMDAxOUM1OS45ODU5IDYuNDY0IDU5Ljk1MzkgNi40NjQgNTkuOTM3OSA2LjQ4QzU5LjkwNTkgNi41MTIgNTkuODczOSA2LjU3NiA1OS44MDk5IDYuNzA0QzU5LjcyOTkgNi44NjQgNTkuNTg1OSA3LjA4OCA1OS4zOTM5IDcuMzc2QzU5LjIwMTkgNy42OCA1OC45OTM5IDcuOTUyIDU4Ljc4NTkgOC4xOTJDNTguNTc3OSA4LjQzMiA1OC4zODU5IDguNjA4IDU4LjIyNTkgOC43MzZMNTguMDE3OSA4LjkxMkg2MS4wNzM5Wk03OS4zMDc1IDE1LjM3NkM3OS40MDM1IDE1LjM3NiA3OS40OTk1IDE1LjM3NiA3OS41OTU1IDE1LjM0NEM3OS44Njc1IDE1LjI4IDgwLjAyNzUgMTUuMDcyIDgwLjA0MzUgMTQuOFYxNC40NDhDODAuMDQzNSAxMS45ODQgODAuMDI3NSA5LjUwNCA4MC4wNDM1IDcuMDRDODAuMDU5NSA2LjU5MiA3OS43MDc1IDYuMjcyIDc5LjI5MTUgNi4yODhDNzguMDI3NSA2LjMwNCA3Ni43NjM1IDYuMjg4IDc1LjQ5OTUgNi4yODhINzUuMjkxNUw3NS4zMjM1IDYuMzJDNzUuMDAzNSA2LjY4OCA3NC42ODM1IDcuMDU2IDc0LjM2MzUgNy40NEg3OS4wNTE1VjEzLjYzMkM3OS4wNTE1IDE0LjQ2NCA3OC4zNzk1IDE1LjEyIDc3LjU0NzUgMTUuMTJINzMuMjQzNVY4LjE3NkM3My4wNTE1IDguMjQgNzIuODkxNSA4LjMwNCA3Mi43MTU1IDguMzY4VjYuMjcyQzczLjU2MzUgNS43NzYgNzMuOTc5NSA0Ljk5MiA3NC4yMDM1IDQuMDQ4SDc2LjEzOTVMNzUuOTYzNSA0LjhIODAuNTIzNUM4MS4xOTU1IDQuOCA4MS43MjM1IDUuMTg0IDgxLjkxNTUgNS44MjRDODEuOTYzNSA1Ljk4NCA4MS45Nzk1IDYuMTYgODEuOTc5NSA2LjMyVjE0Ljk5MkM4MS45Nzk1IDE2LjMzNiA4MC45MjM1IDE3LjA1NiA3OS44ODM1IDE3LjA3MkM3OS4zMjM1IDE3LjA4OCA3OC43Nzk1IDE3LjA3MiA3OC4yMDM1IDE3LjA3MlYxNS4zNzZINzkuMzA3NVpNNjguOTg3NSA3LjQyNEg3MS43Mzk1VjEzLjQyNEM3MS43Mzk1IDE0LjI0IDcyLjA1OTUgMTQuODQ4IDcyLjc5NTUgMTUuMjE2TDcyLjkwNzUgMTUuMjY0VjE3LjEwNEM3Mi43MTU1IDE3LjA1NiA3Mi41MjM1IDE3LjA0IDcyLjM0NzUgMTYuOTkyQzcxLjM4NzUgMTYuNzUyIDcwLjYzNTUgMTYuMjU2IDcwLjE3MTUgMTUuMzc2QzY5LjkxNTUgMTQuODggNjkuODUxNSAxNC4zMzYgNjkuODUxNSAxMy43NzZDNjkuODM1NSAxMi40MTYgNjkuODM1NSAxMS4wNTYgNjkuODM1NSA5LjY5NlY4Ljg5Nkg2OC45ODc1VjcuNDI0Wk03MC45NzE1IDQuMDE2QzcxLjIxMTUgNC44MzIgNzEuNDUxNSA1LjY2NCA3MS43MDc1IDYuNDk2SDY5LjU5NTVDNjkuMzg3NSA1LjY4IDY5LjE5NTUgNC44NjQgNjguOTg3NSA0LjAxNkg3MC45NzE1Wk03Ni42NTE1IDEzLjY4Qzc2Ljk4NzUgMTMuNjggNzcuMjI3NSAxMy40ODggNzcuMjQzNSAxMy4xNTJDNzcuMjU5NSAxMi43NjggNzcuMjQzNSAxMi4zODQgNzcuMjQzNSAxMkg3NS4wNjc1VjEzLjY4SDc2LjY1MTVaTTc3LjI0MzUgMTAuNTQ0VjguOTQ0SDc1LjA2NzVWMTAuNTQ0SDc3LjI0MzVaIiBmaWxsPSJ1cmwoI3BhaW50MF9saW5lYXJfMzI1Ml8xMjA2NykiLz4KPGRlZnM+CjxmaWx0ZXIgaWQ9ImZpbHRlcjBfZl8zMjUyXzEyMDY3IiB4PSItMS40MzA1MWUtMDYiIHk9IjYuODk0NDEiIHdpZHRoPSIxMDguNjA5IiBoZWlnaHQ9IjE2LjIxMTIiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj4KPGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz4KPGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJCYWNrZ3JvdW5kSW1hZ2VGaXgiIHJlc3VsdD0ic2hhcGUiLz4KPGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMy41NTI4IiByZXN1bHQ9ImVmZmVjdDFfZm9yZWdyb3VuZEJsdXJfMzI1Ml8xMjA2NyIvPgo8L2ZpbHRlcj4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDBfbGluZWFyXzMyNTJfMTIwNjciIHgxPSIyNy41OTg0IiB5MT0iMy4wODc1IiB4Mj0iODEuMDkwNiIgeTI9IjguNzY3MjIiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzAwNDFGNiIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxNTdDRkYiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8L3N2Zz4="/>
+    <div class="search-bar${state.searchText?' has-text':''}">
+      <span class="lead">${ICON.search}</span>
+      <input id="ss-input" placeholder="请输入学员姓名" value="${esc(state.searchText)}"/>
+      <button class="btn-clear" data-action="profile-clear" aria-label="清空搜索"><img class="clear-icon" alt="" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMC45ODc1MDNDNC4xNDIxOSAwLjk4NzUwMyAxLjAxNTYyIDQuMTM0MzggMS4wMTU2MiA4LjAxNDA3QzEuMDE1NjIgMTEuODkzOCA0LjE0MjE5IDE1LjA0MDYgOCAxNS4wNDA2QzExLjg1NzggMTUuMDQwNiAxNC45ODQ0IDExLjg5NTMgMTQuOTg0NCA4LjAxNDA3QzE0Ljk4NDQgNC4xMzI4MiAxMS44NTc4IDAuOTg3NTAzIDggMC45ODc1MDNaTTExLjQ3NjYgMTAuOTE3MkMxMS42MzU5IDExLjA3ODEgMTEuNjM1OSAxMS4zNDIyIDExLjQ3NjYgMTEuNTAzMUwxMS4zNTMxIDExLjYyODFDMTEuMTkyMiAxMS43ODkxIDEwLjkyOTcgMTEuNzg5MSAxMC43NzAzIDExLjYyODFMNy45NzAzMSA4LjgxMjVMNS4xNzAzMSAxMS42MjgxQzUuMDA5MzcgMTEuNzg5MSA0Ljc0Njg4IDExLjc4OTEgNC41ODc1IDExLjYyODFMNC40NjQwNiAxMS41MDMxQzQuMzAzMTMgMTEuMzQyMiA0LjMwMzEzIDExLjA3ODEgNC40NjQwNiAxMC45MTcyTDcuMjYyNSA4LjEwMTU3TDQuNDY0MDYgNS4yODQzOEM0LjMwMzEzIDUuMTIzNDQgNC4zMDMxMyA0Ljg1OTM4IDQuNDY0MDYgNC42OTg0NEw0LjU4NzUgNC41NzM0NEM0Ljc0ODQ0IDQuNDEyNSA1LjAxMDk0IDQuNDEyNSA1LjE3MDMxIDQuNTczNDRMNy45NzAzMSA3LjM5MDYzTDEwLjc3MDMgNC41NzM0NEMxMC45Mjk3IDQuNDEyNSAxMS4xOTIyIDQuNDEyNSAxMS4zNTMxIDQuNTczNDRMMTEuNDc2NiA0LjY5ODQ0QzExLjYzNTkgNC44NTkzOCAxMS42MzU5IDUuMTIzNDQgMTEuNDc2NiA1LjI4NDM4TDguNjc2NTYgOC4xMDE1N0wxMS40NzY2IDEwLjkxNzJaIiBmaWxsPSIjQkJCQkJCIi8+Cjwvc3ZnPg==""/></button>
+      <button class="btn-search" data-action="do-search">查询</button>
+    </div>
+  </div>`;
+  return `<div>${searchBox}${below}</div>`;
+}
+
+// 业绩报表数据：实时从「出纳表 cashData」取 预收学费 记录（与学员档案-报读记录同源，均为出纳表）
+function getPerfRows(){
+  return cashData
+    .filter(r=>r['类型']==='预收学费')
+    .map(r=>({
+      date:r['交易日期'],
+      amt:r['交易金额'],
+      clear:r['清算金额'],
+      fee:r['手续费'],
+      company:r['公司名称'],
+      name:r['学生姓名'],
+      grade:r['学生年级']
+    }));
+}
+
+function reportHTML(kind){
+  const conf = kind==='perf'
+    ? {title:'业绩报表', cols:[
+        {k:'date',t:'交易日期'},
+        {k:'amt',t:'交易金额（元）',num:1},
+        {k:'name',t:'学员姓名'}],
+        rows:getPerfRows()}
+    : {title:'课耗报表', cols:[
+        {k:'date',t:'考勤日期'},
+        {k:'name',t:'学员姓名'},
+        {k:'课程年级',t:'课程年级'},
+        {k:'amt',t:'课耗金额（元）',num:1},
+        {k:'subject',t:'科目'}],
+        rows:consumeData};
+  const st=state[kind];
+  const filtered = conf.rows.filter(r=> r.date>=st.start && r.date<=st.end);
+  const dir = st.sortDir==='asc'?1:-1;
+  const sorted=[...filtered].sort((a,b)=>{
+    const x=a[st.sortCol],y=b[st.sortCol];
+    if(typeof x==='number')return (x-y)*dir;
+    if(x<y)return -1*dir;if(x>y)return 1*dir;return 0;
+  });
+  const total=sorted.length; const pages=Math.max(1,Math.ceil(total/st.size));
+  if(st.page>pages)st.page=pages;
+  const startIdx=(st.page-1)*st.size; const pageRows=sorted.slice(startIdx,startIdx+st.size);
+  const head = conf.cols.map(col=>{
+    const sortable = col.k!=='company';
+    const cls = st.sortCol===col.k?'active':'';
+    const arrow = st.sortCol===col.k ? `<span class="arrow">${st.sortDir==='asc'?'▲':'▼'}</span>` : '';
+    return `<th class="${col.num?'num':''} ${sortable?'sortable':''} ${cls}" ${sortable?`data-action="report-sort" data-kind="${kind}" data-col="${col.k}"`:''}>${col.t}${arrow}</th>`;
+  }).join('');
+  const body = pageRows.map(r=>`<tr>${conf.cols.map(col=>`<td class="${col.num?'num':''}">${col.num?money(r[col.k]):esc(r[col.k])}</td>`).join('')}</tr>`).join('');
+  const colCount=conf.cols.length;
+
+  return `<div class="card">
+    <div class="filter-bar">
+      <span class="label">开始日期</span>
+      <span class="date-wrap"><input type="text" readonly class="dp-trigger" id="${kind}-start" value="${st.start}" placeholder="yyyy-mm-dd"/></span>
+      <span class="sep">~</span>
+      <span class="label">结束日期</span>
+      <span class="date-wrap"><input type="text" readonly class="dp-trigger" id="${kind}-end" value="${st.end}" placeholder="yyyy-mm-dd"/></span>
+      <button class="btn btn-primary btn-sm" data-action="report-query" data-kind="${kind}"><span class="i">${ICON.search}</span>查询</button>
+      <button class="btn btn-secondary btn-sm" data-action="report-reset" data-kind="${kind}">重置</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary btn-sm" data-action="report-export" data-kind="${kind}"><span class="i">${ICON.download}</span>导出</button>
+    </div>
+    <table>
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body||`<tr><td colspan="${colCount}" class="empty">无数据</td></tr>`}</tbody>
+    </table>
+    ${paginationHTML(kind, total, st.page, pages)}
+  </div>`;
+}
+
+/* ============ 弹窗 ============ */
+function openModal(html, wide){document.getElementById('modal-root').innerHTML=`<div class="overlay" data-action="overlay-close"><div class="modal ${wide?'wide':''}">${html}</div></div>`;}
+function closeModal(){document.getElementById('modal-root').innerHTML='';}
+
+/* ============ 自定义日历选择器 ============ */
+const dpState={input:null,year:2026,month:0,max:null};
+
+function ensureDPPortal(){
+  let p=document.getElementById('dp-portal');
+  if(!p){p=document.createElement('div');p.id='dp-portal';document.body.appendChild(p);}
+  return p;
+}
+
+function openDP(input){
+  dpState.input=input;
+  dpState.max=input.dataset.max || null;
+  const cur=input.value && /^\d{4}-\d{2}-\d{2}$/.test(input.value) ? new Date(input.value) : new Date();
+  dpState.year=cur.getFullYear(); dpState.month=cur.getMonth();
+  showDP();
+}
+
+function closeDP(){
+  const p=document.getElementById('dp-portal');
+  if(p)p.innerHTML='';
+  dpState.input=null;
+}
+
+function showDP(){
+  const portal=ensureDPPortal();
+  portal.innerHTML=dpHTML();
+  // 定位到 input 下方，溢出校正
+  if(!dpState.input)return;
+  const input=dpState.input;
+  const wrap=input.closest('.date-wrap')||input;
+  const rect=wrap.getBoundingClientRect();
+  const dp=portal.querySelector('.dp');
+  dp.style.top=(window.scrollY+rect.bottom+6)+'px';
+  dp.style.left=(window.scrollX+rect.left)+'px';
+  // 右溢出回退
+  requestAnimationFrame(()=>{
+    const r=dp.getBoundingClientRect();
+    const over=r.right-window.innerWidth+8;
+    if(over>0)dp.style.left=(parseFloat(dp.style.left)-over)+'px';
+  });
+}
+
+function dpHTML(){
+  const months=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const yearOpts=[];
+  for(let y=dpState.year-10;y<=dpState.year+10;y++){
+    yearOpts.push(`<option value="${y}" ${y===dpState.year?'selected':''}>${y}年</option>`);
+  }
+  return `<div class="dp-overlay" data-action="dp-close"></div>
+    <div class="dp">
+      <div class="dp-head">
+        <div class="dp-cur">
+          <select data-dp-year>${yearOpts.join('')}</select>
+          <select data-dp-month>
+            ${months.map((m,i)=>`<option value="${i}" ${i===dpState.month?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="dp-nav">
+          <button data-action="dp-prev" title="上月">${ICON.arrowLeft}</button>
+          <button data-action="dp-next" title="下月">${ICON.arrowRight}</button>
+        </div>
+      </div>
+      <div class="dp-grid">
+        <div class="dp-dow">一</div><div class="dp-dow">二</div><div class="dp-dow">三</div>
+        <div class="dp-dow">四</div><div class="dp-dow">五</div><div class="dp-dow">六</div><div class="dp-dow">日</div>
+        ${dpCellsHTML()}
+      </div>
+      <div class="dp-foot">
+        <button data-action="dp-clear">清除</button>
+        <button data-action="dp-today" class="dp-today">今天</button>
+      </div>
+    </div>`;
+}
+
+function dpCellsHTML(){
+  const y=dpState.year, m=dpState.month;
+  const first=new Date(y,m,1);
+  const dow=first.getDay(); // 0=Sun
+  const offset=dow===0?6:dow-1; // 周一为首
+  const lastDay=new Date(y,m+1,0).getDate();
+  const today=new Date();
+  const sel=dpState.input && dpState.input.value || '';
+  let html='';
+  // 上月尾部
+  for(let i=0;i<offset;i++){
+    const d=new Date(y,m,-offset+1+i);
+    html+=dpCellHTML(d,'dim',today,sel);
+  }
+  // 当月
+  for(let i=1;i<=lastDay;i++){
+    const d=new Date(y,m,i);
+    html+=dpCellHTML(d,'',today,sel);
+  }
+  // 下月头部
+  const trailing=(7-(offset+lastDay)%7)%7;
+  for(let i=1;i<=trailing;i++){
+    const d=new Date(y,m+1,i);
+    html+=dpCellHTML(d,'dim',today,sel);
+  }
+  return html;
+}
+
+function dpCellHTML(d, extraCls, today, sel){
+  const iso=formatDate(d);
+  const cls=['dp-cell'];
+  if(extraCls)cls.push(extraCls);
+  if(d.toDateString()===today.toDateString())cls.push('today');
+  if(iso===sel)cls.push('selected');
+  if(dpState.max && iso>dpState.max) return `<div class="${cls.join(' ')} dim">${d.getDate()}</div>`;
+  return `<div class="${cls.join(' ')}" data-dp-day="${iso}">${d.getDate()}</div>`;
+}
+
+function formatDate(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function addCompanyModal(){
+  openModal(`<div class="modal-head">新增公司<span class="modal-close" data-action="close-modal">×</span></div>
+    <div class="modal-body">
+      <label class="f"><span class="lab">纳税人识别号 <span class="req">*</span></span><input id="nc-tax" placeholder="请输入纳税人识别号"/></label>
+      <label class="f"><span class="lab">公司名称 <span class="req">*</span></span><input id="nc-name" placeholder="请输入公司名称"/></label>
+      <label class="f"><span class="lab">专用账号 <span class="req">*</span></span><input id="nc-account" maxlength="20" placeholder="请输入专用账号（最多20个字符）"/></label>
+      <label class="f"><span class="lab">专用密码 <span class="req">*</span></span><input id="nc-pwd" placeholder="请输入6-16位字符作为公司端登录密码"/></label>
+      <div class="f-row">
+        <label class="f"><span class="lab">成立日期 <span class="req">*</span></span><span class="date-wrap"><input id="nc-found" type="text" readonly class="dp-trigger" placeholder="yyyy-mm-dd"/></span></label>
+        <label class="f"><span class="lab">注销日期</span><span class="date-wrap"><input id="nc-cancel" type="text" readonly class="dp-trigger" placeholder="yyyy-mm-dd"/></span></label>
+      </div>
+      <div id="nc-err"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-company" disabled>保 存</button></div>`);
+  refreshCompanyBtn(COMPANY_FORMS.nc);
+}
+
+function editCompanyModal(id){
+  const c=companies.find(x=>x.id===id);
+  openModal(`<div class="modal-head">编辑公司<span class="modal-close" data-action="close-modal">×</span></div>
+    <div class="modal-body">
+      <label class="f"><span class="lab">id（系统主键）</span><input value="${c.id}" disabled/></label>
+      <label class="f"><span class="lab">纳税人识别号（业务键）</span><input value="${esc(c.tax)}" disabled/></label>
+      <label class="f"><span class="lab">公司名称 <span class="req">*</span></span><input id="ec-name" value="${esc(c.name)}" placeholder="请输入公司名称"/></label>
+      <label class="f"><span class="lab">专用账号 <span class="req">*</span></span><input id="ec-account" maxlength="20" value="${esc(c.account)}" placeholder="请输入专用账号（最多20个字符）"/></label>
+      <label class="f"><span class="lab">专用密码 <span class="req">*</span></span><input id="ec-pwd" value="${esc(c.pwd)}" placeholder="请输入6-16位字符作为公司端登录密码"/></label>
+      <div class="f-row">
+        <label class="f"><span class="lab">成立日期 <span class="req">*</span></span><span class="date-wrap"><input id="ec-found" type="text" readonly class="dp-trigger" value="${c.found}" placeholder="yyyy-mm-dd"/></span></label>
+        <label class="f"><span class="lab">注销日期</span><span class="date-wrap"><input id="ec-cancel" type="text" readonly class="dp-trigger" value="${c.cancel}" placeholder="yyyy-mm-dd"/></span></label>
+      </div>
+      <div id="ec-err"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="update-company" data-id="${c.id}" disabled>保 存</button></div>`);
+  refreshCompanyBtn(COMPANY_FORMS.ec);
+}
+
+function uploadModal(ctx){
+  openModal(`<div class="modal-head">上传数据${ctx}<span class="modal-close" data-action="close-modal">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px;color:var(--text-2);">请选择 Excel 文件（.xlsx / .xls），每次仅 1 个文件，覆盖当月数据。</div>
+      <div class="file-picker">
+        <input type="file" accept=".xlsx,.xls" id="up-file" class="file-input-hidden"/>
+        <label for="up-file" class="btn btn-primary file-pick-btn"><span class="i">${ICON.upload}</span>选择文件</label>
+        <span id="up-file-name" class="file-name">未选择任何文件</span>
+      </div>
+      <div style="background:#fafbfc;border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.7;">
+        <b style="color:var(--text);">校验规则：</b>
+        <ol style="margin:6px 0 0;padding-left:20px;">
+          <li>工作簿须含「账户表 / 出纳表 / 课耗表」三张</li>
+          <li>表头必须与导入模板一致</li>
+          <li>所有字段必填；数据源年月 = 当月</li>
+          <li>纳税人识别号需匹配系统中的公司（存续 / 已注销均可导入）</li>
+        </ol>
+      </div>
+      <div style="margin-top:14px;"><button class="btn btn-link" data-action="download-template"><span class="i">${ICON.download}</span>下载导入模板（标准表头）</button></div>
+      <div id="up-msg" style="margin-top:10px;"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="do-upload">开始上传</button></div>`);
+}
+
+function studentDetailHTML(s){
+  const lp=state.liPage;
+  const lsz=state.liSize;
+  const tab=state.profileTab || 'enroll';
+  const today=todayISO();
+  const remain=accountRemain(s.code, state.loggedIn);
+
+  const block=(()=>{
+    const f=state.liFilter[tab];
+    const filterBar=(kind)=>`<div class="filter-bar">
+      <span class="label">开始日期</span>
+      <span class="date-wrap"><input type="text" readonly class="dp-trigger" id="li-${kind}-start" value="${esc(f.start)}" placeholder="yyyy-mm-dd"/></span>
+      <span class="sep">~</span>
+      <span class="label">结束日期</span>
+      <span class="date-wrap"><input type="text" readonly class="dp-trigger" id="li-${kind}-end" value="${esc(f.end)}" placeholder="yyyy-mm-dd"/></span>
+      <button class="btn btn-primary btn-sm" data-action="detail-query" data-kind="${kind}"><span class="i">${ICON.search}</span>查询</button>
+      <button class="btn btn-secondary btn-sm" data-action="detail-reset" data-kind="${kind}">重置</button>
+    </div>`;
+
+    if(tab==='enroll'){
+      let rows=cashData.filter(r=> r['学员编号']===s.code && r['类型']==='预收学费');
+      if(f.start&&f.end) rows=rows.filter(r=> r['交易日期']>=f.start && r['交易日期']<=f.end);
+      rows=rows.slice().sort((a,b)=> b['交易日期'].localeCompare(a['交易日期']));
+      const total=rows.length, pages=Math.max(1,Math.ceil(total/lsz.enroll)), p=Math.min(lp.enroll,pages);
+      const slice=rows.slice((p-1)*lsz.enroll, p*lsz.enroll);
+      const body=slice.map(r=>{
+        const v=(r['交易日期']===today)?`<button class="btn btn-void btn-sm" data-action="enroll-void" data-id="${esc(r['id'])}" data-date="${esc(r['交易日期'])}" data-amt="${esc(money(r['交易金额']))}">作废</button>`:'';
+        return `<tr><td>${esc(r['交易日期'])}</td><td class="num">${money(r['交易金额'])}</td><td class="row-action">${v}</td></tr>`;
+      }).join('');
+      return `${filterBar('enroll')}
+      <table class="data-table">
+        <thead><tr><th>交易日期</th><th class="num">交易金额（元）</th><th></th></tr></thead>
+        <tbody>${body||`<tr><td colspan="3" class="empty">暂无数据</td></tr>`}</tbody>
+      </table>
+      ${detailPaginationHTML('enroll', total, p, pages, lsz.enroll)}`;
+    }
+    if(tab==='consume'){
+      let rows=consumeData.filter(r=> r['学员编号']===s.code);
+      if(f.start&&f.end) rows=rows.filter(r=> r['date']>=f.start && r['date']<=f.end);
+      rows=rows.slice().sort((a,b)=> b['date'].localeCompare(a['date']));
+      const total=rows.length, pages=Math.max(1,Math.ceil(total/lsz.consume)), p=Math.min(lp.consume,pages);
+      const slice=rows.slice((p-1)*lsz.consume, p*lsz.consume);
+      const body=slice.map(r=>{
+        const v=(r['date']===today)?`<button class="btn btn-void btn-sm" data-action="consume-void" data-id="${esc(r.id)}" data-date="${esc(r.date)}" data-subject="${esc(r.subject)}">作废</button>`:'';
+        return `<tr><td>${esc(r.date)}</td><td>${esc(r.subject)}</td><td class="num">${money(r.amt)}</td><td class="row-action">${v}</td></tr>`;
+      }).join('');
+      return `${filterBar('consume')}
+      <table class="data-table">
+        <thead><tr><th>考勤日期</th><th>科目</th><th class="num">课耗金额（元）</th><th></th></tr></thead>
+        <tbody>${body||`<tr><td colspan="4" class="empty">暂无数据</td></tr>`}</tbody>
+      </table>
+      ${detailPaginationHTML('consume', total, p, pages, lsz.consume)}`;
+    }
+    // refund
+    let rows=cashData.filter(r=> r['学员编号']===s.code && r['类型']==='预收退款');
+    if(f.start&&f.end) rows=rows.filter(r=> r['交易日期']>=f.start && r['交易日期']<=f.end);
+    rows=rows.slice().sort((a,b)=> b['交易日期'].localeCompare(a['交易日期']));
+    const total=rows.length, pages=Math.max(1,Math.ceil(total/lsz.refund)), p=Math.min(lp.refund,pages);
+    const slice=rows.slice((p-1)*lsz.refund, p*lsz.refund);
+    const body=slice.map(r=>`<tr><td>${esc(r['交易日期'])}</td><td class="num">${money(r['交易金额'])}</td></tr>`).join('');
+    return `${filterBar('refund')}
+      <table class="data-table">
+        <thead><tr><th>退费日期</th><th class="num">退费金额（元）</th></tr></thead>
+        <tbody>${body||`<tr><td colspan="2" class="empty">暂无数据</td></tr>`}</tbody>
+      </table>
+      ${detailPaginationHTML('refund', total, p, pages, lsz.refund)}`;
+  })();
+
+  return `<div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="hero">
+        <div class="hero-item">
+          <div class="ico-circle">${ICON.user}</div>
+          <div class="info">
+            <div class="val">${esc(s.name)}</div>
+            <div class="lab">${esc(maskCode(s.code))}</div>
+          </div>
+        </div>
+        <div class="hero-amount">
+          <div class="hero-item">
+            <div class="ico-circle">${ICON.yuan}</div>
+            <div class="info">
+              <div class="val din-num">${money(remain)}<small>元</small></div>
+              <div class="lab">剩余学费</div>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button class="btn-light hero-enroll-btn" data-action="open-enroll-profile">报名</button>
+            ${remain>0
+              ? `<button class="btn-light hero-attend-btn" data-action="open-attend">考勤</button>`
+              : `<span class="tip-wrap is-disabled" data-tip="当前学员无剩余金额无法考勤"><button class="btn-light hero-attend-btn" disabled>考勤</button></span>`}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs" style="margin-top:18px;background:#fff;border:1px solid var(--border-soft);border-bottom:none;border-radius:12px 12px 0 0;padding-left:20px;">
+      <button class="tab ${tab==='enroll'?'active':''}" data-action="profile-subtab" data-tab="enroll">报读记录</button>
+      <button class="tab ${tab==='consume'?'active':''}" data-action="profile-subtab" data-tab="consume">课耗记录</button>
+      <button class="tab ${tab==='refund'?'active':''}" data-action="profile-subtab" data-tab="refund">退费记录</button>
+    </div>
+    <div class="card" style="margin-top:0;border-top:none;border-top-left-radius:0;border-top-right-radius:0;">
+      ${block}
+    </div>
+
+    <div style="margin-top:18px;text-align:center;">
+      <button class="btn btn-secondary" data-action="profile-back"><span class="i">${ICON.arrowLeft}</span>返回学员搜索</button>
+    </div>
+  </div>`;
+}
+
+/* ============ 事件 ============ */
+document.addEventListener('click',e=>{
+  // 1) 日历选择器（#dp-portal）内部事件
+  if(e.target.closest('#dp-portal')){
+    const el=e.target.closest('[data-action]');
+    if(el){
+      const a=el.dataset.action;
+      if(a==='dp-prev'){dpState.month--; if(dpState.month<0){dpState.month=11;dpState.year--;} showDP(); return;}
+      if(a==='dp-next'){dpState.month++; if(dpState.month>11){dpState.month=0;dpState.year++;} showDP(); return;}
+      if(a==='dp-clear'){ if(dpState.input){dpState.input.value='';dpState.input.dispatchEvent(new Event('input',{bubbles:true}));} closeDP(); return;}
+      if(a==='dp-today'){
+        const t=new Date();
+        if(dpState.max && formatDate(t)>dpState.max) return;
+        if(dpState.input){dpState.input.value=formatDate(t);dpState.input.dispatchEvent(new Event('input',{bubbles:true}));}
+        closeDP();
+        return;
+      }
+      if(a==='dp-close'){ closeDP(); return;}
+    }
+    const day=e.target.closest('[data-dp-day]');
+    if(day && dpState.input){
+      dpState.input.value=day.dataset.dpDay; dpState.input.dispatchEvent(new Event('input',{bubbles:true}));
+      closeDP();
+      return;
+    }
+    return; // dp 内的点击不再走主委托
+  }  // 2) 点击 .date-wrap 任意位置打开日历
+  if(e.target.closest('.date-wrap')){
+    const input=e.target.closest('.date-wrap').querySelector('input');
+    if(input && input.classList.contains('dp-trigger')){
+      openDP(input);
+      return;
+    }
+  }
+
+  // 3) 原有的 [data-action] 主委托
+  const el=e.target.closest('[data-action]');
+  if(!el){return;}
+  const a=el.dataset.action;
+  switch(a){
+    case 'nav-admin': state.side='admin'; state.adminRoute='company'; state.selectedStudent=null; render(); break;
+    case 'nav-company': state.side='company'; state.loggedIn=null; state.selectedStudent=null; render(); break;
+    case 'back-home': state.side='home'; state.selectedStudent=null; render(); break;
+    case 'admin-nav': state.adminRoute=el.dataset.route; render(); break;
+    case 'adm-search': {const t=document.getElementById('adm-tax').value;state.adminSearch=t;state.adminPage=1;render();break;}
+    case 'adm-reset': state.adminSearch=''; state.adminPage=1; render(); break;
+    case 'admin-page': {const p=Number(el.dataset.page);if(p>=1)state.adminPage=p;render();break;}
+    case 'add-company': addCompanyModal(); break;
+    case 'edit-company': editCompanyModal(Number(el.dataset.id)); break;
+    case 'save-company': saveCompany(); break;
+    case 'update-company': updateCompany(Number(el.dataset.id)); break;
+    case 'data-tab': state.dataTab=el.dataset.tab; render(); break;
+    case 'open-upload': state.uploadMonth=Number(el.dataset.month); uploadModal(` · ${el.dataset.month}月`); break;
+    case 'open-enroll': state.enrollCtx={mode:'new'}; enrollModal(); break;
+    case 'open-enroll-profile': state.enrollCtx={mode:'profile', code:state.selectedStudent.code, name:state.selectedStudent.name, grade:state.selectedStudent.grade}; enrollModal(); break;
+    case 'open-attend': attendModal(); break;
+    case 'toggle-pwd': {
+      const cell=el.closest('.pwd-cell');
+      const txt=cell.querySelector('.pwd-text');
+      if(el.dataset.shown==='1'){
+        txt.textContent='••••••';
+        el.innerHTML=ICON.eye;
+        el.dataset.shown='';
+        el.setAttribute('aria-label','显示密码');
+      } else {
+        txt.textContent=el.dataset.pwd;
+        el.innerHTML=ICON.eyeOff;
+        el.dataset.shown='1';
+        el.setAttribute('aria-label','隐藏密码');
+      }
+      break;
+    }
+    case 'toggle-login-pwd': {
+      const inp=document.getElementById('login-pwd');
+      if(!inp) break;
+      if(inp.type==='password'){ inp.type='text'; el.innerHTML=ICON.eyeOff; el.setAttribute('aria-label','隐藏密码'); }
+      else { inp.type='password'; el.innerHTML=ICON.eye; el.setAttribute('aria-label','显示密码'); }
+      break;
+    }
+    case 'download-template': downloadTemplate(); break;
+    case 'do-upload': doUpload(); break;
+    case 'download-src': downloadSource(Number(el.dataset.month)); break;
+    case 'enroll-submit': enrollSubmit(); break;
+    case 'attend-submit': attendSubmit(); break;
+    case 'overlay-close': if(el===e.target) closeModal(); break;
+    case 'close-modal': closeModal(); break;
+    case 'do-login': doLogin(); break;
+    case 'logout': state.loggedIn=null; state.side='company'; state.selectedStudent=null; render(); break;
+    case 'company-nav':
+      state.companyRoute=el.dataset.route;
+      state.selectedStudent=null;
+      render();
+      break;
+    case 'profile-clear': state.searchText=''; state.searchResults=null; render(); { const si=document.getElementById('ss-input'); if(si)si.focus(); } break;
+    case 'profile-back': state.selectedStudent=null; render(); break;
+    case 'do-search': doSearch(); break;
+    case 'open-detail': {
+      // 优先从搜索结果（由账户表派生，含新生）查找，回退到种子 students
+      const s=(state.searchResults||[]).find(x=>x.code===el.dataset.code) || students.find(x=>x.code===el.dataset.code);
+      if(!s){ toast('未找到该学员档案','err'); return; }
+      state.selectedStudent=s;
+      state.companyRoute='profile';
+      state.liPage={enroll:1, consume:1, refund:1};
+      state.liFilter=defaultLiFilter();
+      state.profileTab='enroll';
+      render();
+      break;
+    }
+    case 'consume-void': confirmVoid(el.dataset.id, el.dataset.date, el.dataset.subject); break;
+    case 'consume-void-confirm': closeModal(); voidConsume(el.dataset.id); break;
+    case 'enroll-void': {
+      const rec=cashData.find(r=>r['id']===el.dataset.id);
+      if(rec){
+        const amt=parseFloat(rec['交易金额'])||0;
+        const remain=accountRemain(rec['学员编号'], {name:rec['公司名称'], tax:rec['纳税人识别号']});
+        if(remain < amt){ toast('剩余金额不足，无法作废该报读记录。','err'); break; }
+      }
+      confirmEnrollVoid(el.dataset.id, el.dataset.date, el.dataset.amt);
+      break;
+    }
+    case 'enroll-void-confirm': closeModal(); voidEnroll(el.dataset.id); break;
+    case 'report-sort': {const k=el.dataset.kind,col=el.dataset.col;const st=state[k];if(st.sortCol===col)st.sortDir=st.sortDir==='asc'?'desc':'asc';else{st.sortCol=col;st.sortDir='asc';}st.page=1;render();break;}
+    case 'report-page': {const k=el.dataset.kind,p=Number(el.dataset.page);if(p<1)break;state[k].page=p;render();break;}
+    case 'detail-page': {const k=el.dataset.kind,p=Number(el.dataset.page);if(p<1)break;state.liPage[k]=p;render();break;}
+    case 'profile-subtab': {state.profileTab=el.dataset.tab;render();break;}
+    case 'detail-query': {
+      const k=el.dataset.kind;
+      const s=document.getElementById('li-'+k+'-start').value;
+      const en=document.getElementById('li-'+k+'-end').value;
+      if(!s||!en){toast('请选择起止日期','err');break;}
+      const days=(new Date(en)-new Date(s))/86400000;
+      if(days<0){toast('结束日期不能早于开始日期','err');break;}
+      state.liFilter[k].start=s; state.liFilter[k].end=en;
+      state.liPage[k]=1; render();
+      break;
+    }
+    case 'detail-reset': {
+      const k=el.dataset.kind;
+      state.liFilter[k].start=''; state.liFilter[k].end='';
+      state.liPage[k]=1; render();
+      break;
+    }
+    case 'report-query': {
+      const k=el.dataset.kind;
+      const s=document.getElementById(k+'-start').value;
+      const en=document.getElementById(k+'-end').value;
+      if(!s||!en){toast('请选择起止日期','err');break;}
+      const days=(new Date(en)-new Date(s))/86400000;
+      if(days<0){toast('结束日期不能早于开始日期','err');break;}
+      if(days>91){toast('时间跨度不能超过 91 天','err');break;}
+      if(s<state.loggedIn.found){toast('最早日期不能早于公司成立日','err');break;}
+      state[k].start=s;state[k].end=en;state[k].page=1;render();
+      break;
+    }
+    case 'report-reset': {
+      const k=el.dataset.kind;
+      const r=monthRange();
+      state[k].start=r.start; state[k].end=r.end; state[k].page=1; render();
+      break;
+    }
+    case 'report-export': exportReport(el.dataset.kind); break;
+  }
+});
+
+document.addEventListener('change',e=>{
+  if(e.target.dataset.dpYear!==undefined){dpState.year=Number(e.target.value);showDP();return;}
+  if(e.target.dataset.dpMonth!==undefined){dpState.month=Number(e.target.value);showDP();return;}
+  if(e.target.id==='up-file'){
+    const span=document.getElementById('up-file-name');
+    if(span){
+      const name=e.target.files[0]?e.target.files[0].name:'';
+      if(name){span.textContent=name;span.classList.add('has-file');}
+      else{span.textContent='未选择任何文件';span.classList.remove('has-file');}
+    }
+  }
+  if(e.target.id==='data-year'){state.dataYear=Number(e.target.value);render();}
+  if(e.target.id.endsWith('-size')){
+    const k=e.target.id.replace('-size','');
+    const v=Number(e.target.value);
+    if(k==='admin'){state.adminSize=v;state.adminPage=1;}
+    else if(state.liSize && state.liSize[k]!==undefined){state.liSize[k]=v;state.liPage[k]=1;}
+    else if(state[k]){state[k].size=v;state[k].page=1;}
+    render();
+  }
+});
+window.addEventListener('scroll',()=>{if(dpState.input)closeDP();},true);
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter' && e.target.id==='ss-input'){doSearch();}
+});
+
+/* ============ 业务函数 ============ */
+function render(){renderApp();}
+function renderApp(){
+  const app=document.getElementById('app');
+  if(state.side==='home') app.innerHTML=homeHTML();
+  else if(state.side==='admin') app.innerHTML=adminFrameHTML();
+  else if(state.side==='company'){ app.innerHTML = state.loggedIn ? companyFrameHTML() : loginHTML(); }
+}
+
+function doLogin(){
+  const name=document.getElementById('login-name').value.trim();
+  const account=document.getElementById('login-account').value.trim();
+  const pwd=document.getElementById('login-pwd').value;
+  if(!name){toast('请输入公司名称','err');return;}
+  if(!account){toast('请输入账号','err');return;}
+  if(!pwd){toast('请输入密码','err');return;}
+  const c=companies.find(x=>x.name===name);
+  if(!c){toast('公司不存在','err');return;}
+  if(deriveStatus(c)==='已注销'){toast('该公司已注销，无法登录','err');return;}
+  // 公司名称匹配后，公司账号、公司密码必须同时正确才能进入公司端
+  if(c.account!==account){toast('账号错误','err');return;}
+  if(c.pwd!==pwd){toast('密码错误','err');return;}
+  state.loggedIn=c; state.companyRoute='profile'; render();
+  toast('登录成功','ok');
+}
+
+function saveCompany(){
+  const tax=document.getElementById('nc-tax').value.trim();
+  const name=document.getElementById('nc-name').value.trim();
+  const account=document.getElementById('nc-account').value.trim();
+  const pwd=document.getElementById('nc-pwd').value.trim();
+  const found=document.getElementById('nc-found').value;
+  const cancel=document.getElementById('nc-cancel').value;
+  const err=document.getElementById('nc-err');
+  if(!tax){err.innerHTML='<div class="err">纳税人识别号不能为空</div>';return;}
+  if(companies.some(c=>c.tax===tax)){err.innerHTML='<div class="err">纳税人识别号已存在，请核对</div>';return;}
+  if(!name){err.innerHTML='<div class="err">公司名称不能为空</div>';return;}
+  if(!/^[一-龥]+$/.test(name)){err.innerHTML='<div class="err">公司名称仅允许中文</div>';return;}
+  if(!account){err.innerHTML='<div class="err">专用账号不能为空</div>';return;}
+  if(account.length>20){err.innerHTML='<div class="err">专用账号最多20个字符</div>';return;}
+  if(!pwd){err.innerHTML='<div class="err">专用密码不能为空</div>';return;}
+  if(!found){err.innerHTML='<div class="err">成立日期不能为空</div>';return;}
+  if(cancel && cancel<found){err.innerHTML='<div class="err">注销日期不得早于成立日期</div>';return;}
+  const maxId=Math.max(...companies.map(c=>c.id));
+  companies.push({id:maxId+1,tax,name,account,pwd,found,cancel});
+  closeModal(); render(); toast('新增成功，已生成登录身份','ok');
+}
+
+function updateCompany(id){
+  const c=companies.find(x=>x.id===id);
+  const name=document.getElementById('ec-name').value.trim();
+  const account=document.getElementById('ec-account').value.trim();
+  const pwd=document.getElementById('ec-pwd').value.trim();
+  const found=document.getElementById('ec-found').value;
+  const cancel=document.getElementById('ec-cancel').value;
+  const err=document.getElementById('ec-err');
+  if(!name){err.innerHTML='<div class="err">公司名称不能为空</div>';return;}
+  if(!/^[一-龥]+$/.test(name)){err.innerHTML='<div class="err">公司名称仅允许中文</div>';return;}
+  if(!account){err.innerHTML='<div class="err">专用账号不能为空</div>';return;}
+  if(account.length>20){err.innerHTML='<div class="err">专用账号最多20个字符</div>';return;}
+  if(!pwd){err.innerHTML='<div class="err">专用密码不能为空</div>';return;}
+  if(!found){err.innerHTML='<div class="err">成立日期不能为空</div>';return;}
+  if(cancel && cancel<found){err.innerHTML='<div class="err">注销日期不得早于成立日期</div>';return;}
+  c.name=name; c.account=account; c.pwd=pwd; c.found=found; c.cancel=cancel;
+  closeModal(); render(); toast('保存成功','ok');
+}
+
+const COMPANY_FORMS={
+  nc:{required:['nc-tax','nc-name','nc-account','nc-pwd','nc-found'], err:'nc-err', btn:'save-company'},
+  ec:{required:['ec-name','ec-account','ec-pwd','ec-found'], err:'ec-err', btn:'update-company'}
+};
+const FIELD_LABEL={'nc-tax':'纳税人识别号','nc-name':'公司名称','nc-account':'专用账号','nc-pwd':'专用密码','nc-found':'成立日期','ec-name':'公司名称','ec-account':'专用账号','ec-pwd':'专用密码','ec-found':'成立日期'};
+function refreshCompanyBtn(cfg){
+  const btn=document.querySelector(`.modal-foot [data-action="${cfg.btn}"]`);
+  if(!btn)return;
+  const ok=cfg.required.every(id=>{const el=document.getElementById(id);return el&&el.value.trim()!=='';});
+  btn.disabled=!ok;
+}
+const whichForm=id=>{for(const k in COMPANY_FORMS){if(COMPANY_FORMS[k].required.includes(id))return k;}return null;};
+// 输入时：仅清除已填字段的红框/提示并刷新按钮（不主动报错）
+document.addEventListener('input',e=>{
+  const id=e.target&&e.target.id; if(!id)return;
+  if(id==='ss-input'){ const bar=e.target.closest('.search-bar'); if(bar) bar.classList.toggle('has-text', e.target.value.length>0); return; }
+  if(id.indexOf('en-')===0 && id!=='en-code'){
+    const el=e.target; el.classList.remove('invalid');
+    const err=document.getElementById('en-err-'+id.slice(3));
+    if(err)err.innerHTML='';
+    if(id==='en-amt'){
+      let v=el.value.replace(/[^\d.]/g,'');
+      const ps=v.split('.');
+      if(ps.length>2) v=ps[0]+'.'+ps.slice(1).join('');
+      if(ps[1]!==undefined) v=ps[0]+'.'+ps[1].slice(0,2);
+      el.value=v;
+    }
+    refreshEnrollBtn(); return;
+  }
+  if(id.indexOf('att-')===0 && id!=='att-code'){
+    const el=e.target; el.classList.remove('invalid');
+    const err=document.getElementById('att-err-'+id.slice(4));
+    if(err)err.innerHTML='';
+    if(id==='att-amt'){ let v=el.value.replace(/[^\d.]/g,''); const ps=v.split('.'); if(ps.length>2) v=ps[0]+'.'+ps.slice(1).join(''); if(ps[1]!==undefined) v=ps[0]+'.'+ps[1].slice(0,2); el.value=v; }
+    refreshAttendBtn(); return;
+  }
+  const key=whichForm(id); if(!key)return;
+  const cfg=COMPANY_FORMS[key], el=document.getElementById(id), errBox=document.getElementById(cfg.err);
+  if(el.value.trim()!==''){ el.classList.remove('invalid'); if(errBox&&errBox.textContent.indexOf('不能为空')>=0)errBox.innerHTML=''; }
+  refreshCompanyBtn(cfg);
+});
+// 失焦时：校验必填项是否已填写，未填则标红并在错误区提示
+document.addEventListener('focusout',e=>{
+  const id=e.target&&e.target.id; if(!id)return;
+  if(id.indexOf('en-')===0 && id!=='en-code'){
+    if(id==='en-name'){
+      const v=e.target.value.trim(), err=document.getElementById('en-err-name');
+      if(!v){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">学员姓名不能为空</div>';}
+      else if(!/^[一-龥]+$/.test(v)){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">姓名须为2-20位中文</div>';}
+      else {e.target.classList.remove('invalid'); if(err)err.innerHTML='';}
+    } else if(id==='en-amt'){
+      const v=e.target.value.trim(), err=document.getElementById('en-err-amt'), n=parseFloat(v);
+      if(!v||!(n>0)){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">交易金额须大于0</div>';}
+      else if(Math.round(n*100)/100!==n||n>1000000){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">金额最多2位小数且不超过100万</div>';}
+      else {e.target.classList.remove('invalid'); if(err)err.innerHTML='';}
+    } else if(id==='en-date'){
+      const v=e.target.value.trim(), err=document.getElementById('en-err-date');
+      if(!v){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">请选择交易日期</div>';}
+      else {e.target.classList.remove('invalid'); if(err)err.innerHTML='';}
+    }
+    refreshEnrollBtn(); return;
+  }
+  if(id.indexOf('att-')===0 && id!=='att-code'){
+    if(id==='att-amt'){
+      const v=e.target.value.trim(), err=document.getElementById('att-err-amt'), n=parseFloat(v);
+      if(!v||!(n>0)){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">课耗金额须大于0</div>';}
+      else if(Math.round(n*100)/100!==n||n>1000000){e.target.classList.add('invalid'); if(err)err.innerHTML='<div class="err">金额最多2位小数且不超过100万</div>';}
+      else {e.target.classList.remove('invalid'); if(err)err.innerHTML='';}
+    }
+    refreshAttendBtn(); return;
+  }
+  const key=whichForm(id); if(!key)return;
+  const cfg=COMPANY_FORMS[key], el=document.getElementById(id), v=el.value.trim(), errBox=document.getElementById(cfg.err);
+  if(!v){ el.classList.add('invalid'); if(errBox)errBox.innerHTML=`<div class="err">${FIELD_LABEL[id]||'该项'}不能为空</div>`; }
+  else if((id==='nc-name'||id==='ec-name') && !/^[一-龥]+$/.test(v)){ el.classList.add('invalid'); if(errBox)errBox.innerHTML=`<div class="err">公司名称仅允许中文</div>`; }
+  else { el.classList.remove('invalid'); if(errBox&&errBox.textContent.indexOf('不能为空')>=0)errBox.innerHTML=''; }
+  refreshCompanyBtn(cfg);
+});
+
+document.addEventListener('change',e=>{
+  const id=e.target&&e.target.id;
+  if(id==='en-date'){
+    const el=e.target, err=document.getElementById('en-err-date');
+    if(el.value){el.classList.remove('invalid'); if(err)err.innerHTML='';}
+    refreshEnrollBtn();
+  } else if(id.indexOf('att-')===0 && id!=='att-code'){
+    const el=e.target, err=document.getElementById('att-err-'+id.slice(4));
+    if(el.value){el.classList.remove('invalid'); if(err)err.innerHTML='';}
+    refreshAttendBtn();
+  }
+});
+
+function buildStudentsFromAccount(){
+  const map={};
+  accountData.forEach(r=>{
+    const code=r['学员编号'], name=r['学生姓名'], grade=r['学生年级'];
+    if(!name) return;
+    if(!map[code]) map[code]={code, name, grade, remain:accountRemain(code, state.loggedIn)};
+  });
+  return Object.values(map);
+}
+// 剩余学费：取自账户表（学员编号 + 当前登录公司）最新年月的「本月剩余」字段；
+// 该字段为滚动余额——以导入的账户表月度核算为基准，系统内的报名（预收学费，加）/ 考勤（课耗，减）实时维护，
+// 等价于「账户表本月剩余 + 系统内报班金额 − 系统内课耗金额」。
+function accountRemain(code, company){
+  if(!code) return 0;
+  const compKey = (company && typeof company==='object') ? (company.tax || company.name) : company;
+  const rows = accountData.filter(r=> r['学员编号']===code && (compKey ? (r['公司名称']===compKey || r['纳税人识别号']===compKey) : true));
+  if(!rows.length) return 0;
+  rows.sort((a,b)=> String(a['年月']).localeCompare(String(b['年月'])));
+  const v = parseFloat(rows[rows.length-1]['本月剩余']);
+  return isNaN(v) ? 0 : Math.round(v*100)/100;
+}
+function doSearch(){
+  const t=document.getElementById('ss-input').value.trim();
+  state.searchText=t;
+  if(!t){toast('请输入学生姓名','err');return;}
+  const q=t.toLowerCase();
+  const list=buildStudentsFromAccount();
+  state.searchResults=list.filter(s=> s.name.toLowerCase().includes(q) || (s.code||'').toLowerCase().includes(q));
+  render();
+}
+
+function enrollModal(){
+  const ctx = state.enrollCtx || {mode:'new'};
+  const isProfile = ctx.mode==='profile';
+  const code = isProfile ? ctx.code : nextEnrollCode();
+  if(!isProfile) enrollSeq++;
+  state.enrollCode = code;
+  const today=todayISO();
+  const nameVal = isProfile ? esc(ctx.name) : esc(state.searchText);
+  const nameAttr = isProfile ? 'readonly disabled' : '';
+  const title = isProfile ? '报名' : '新生报名';
+  openModal(`<div class="modal-head">${title}<span class="modal-close" data-action="close-modal">×</span></div>
+    <div class="modal-body">
+      <label class="f"><span class="lab">学员姓名 <span class="req">*</span></span><input id="en-name" maxlength="20" placeholder="请输入学员姓名" value="${nameVal}" ${nameAttr}/><div class="err" id="en-err-name"></div></label>
+      <label class="f"><span class="lab">交易金额（元） <span class="req">*</span></span><input id="en-amt" type="text" inputmode="decimal" placeholder="0.00"/><div class="err" id="en-err-amt"></div></label>
+      <label class="f"><span class="lab">交易日期 <span class="req">*</span></span><span class="date-wrap"><input id="en-date" type="text" readonly class="dp-trigger" value="${today}" data-max="${today}" placeholder="yyyy-mm-dd"/></span><div class="err" id="en-err-date"></div></label>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" data-action="close-modal">暂不报名</button><button class="btn btn-primary" data-action="enroll-submit" id="en-submit" disabled>立即报名</button></div>`, true);
+  refreshEnrollBtn();
+}
+function refreshEnrollBtn(){
+  const b=document.getElementById('en-submit'); if(!b)return;
+  const name=document.getElementById('en-name'), amt=document.getElementById('en-amt'), date=document.getElementById('en-date');
+  const ok = name && name.value.trim()!=='' && amt && parseFloat(amt.value)>0 && date && date.value!=='';
+  b.disabled=!ok;
+}
+function setEnrollErr(id, errId, msg){
+  const el=document.getElementById(id); if(el)el.classList.add('invalid');
+  const e=document.getElementById(errId); if(e)e.innerHTML=msg;
+}
+function clearEnrollErr(id, errId){
+  const el=document.getElementById(id); if(el)el.classList.remove('invalid');
+  const e=document.getElementById(errId); if(e)e.innerHTML='';
+}
+function enrollSubmit(){
+  const ctx = state.enrollCtx || {mode:'new'};
+  const isProfile = ctx.mode==='profile';
+  const nameEl=document.getElementById('en-name');
+  const amtEl=document.getElementById('en-amt');
+  const dateEl=document.getElementById('en-date');
+  const code=state.enrollCode;
+  let name, grade;
+  if(isProfile){ name=ctx.name; grade=ctx.grade; }
+  else { name=nameEl.value.trim(); grade=''; }
+  const amt=parseFloat(amtEl.value);
+  const date=dateEl.value;
+  if(!isProfile){
+    if(!name){setEnrollErr('en-name','en-err-name','学员姓名不能为空');nameEl.focus();return;}
+    if(!/^[一-龥]{2,20}$/.test(name)){setEnrollErr('en-name','en-err-name','姓名须为2-20位中文');nameEl.focus();return;}
+  }
+  if(!(amt>0)){setEnrollErr('en-amt','en-err-amt','交易金额须大于0');amtEl.focus();return;}
+  if(Math.round(amt*100)/100!==amt || amt>1000000){setEnrollErr('en-amt','en-err-amt','金额最多2位小数且不超过100万');amtEl.focus();return;}
+  if(!date){setEnrollErr('en-date','en-err-date','请选择交易日期');dateEl.focus();return;}
+  const comp=state.loggedIn;
+  if(!comp){toast('未获取到登录公司信息','err');return;}
+  const [y,m]=date.split('-');
+  // 出纳表新增记录（两种模式相同）
+  const row={}; CASH_FIELDS.forEach(k=>row[k]='');
+  row['年月']=`${y}-${m}`; row['公司名称']=comp.name; row['纳税人识别号']=comp.tax;
+  row['交易日期']=date; row['交易金额']=amt; row['清算金额']=amt; row['手续费']=0; row['在线支付']=amt; row['类型']='预收学费';
+  row['学生姓名']=name; row['学员编号']=code; row['学生年级']=grade;
+  row['id']='cash_en_'+Date.now();
+  cashData.push(row);
+  if(isProfile){
+    // 账户表更新：定位 学员编号+公司 最新年月，预收/本月剩余 累加交易金额
+    const rows=accountData.filter(r=> r['学员编号']===code && (r['公司名称']===comp.name || r['纳税人识别号']===comp.tax));
+    if(rows.length){
+      let target=rows[0];
+      rows.forEach(r=>{ if(r['年月']>target['年月']) target=r; });
+      target['预收']=Math.round(((parseFloat(target['预收'])||0)+amt)*100)/100;
+      target['本月剩余']=Math.round(((parseFloat(target['本月剩余'])||0)+amt)*100)/100;
+    } else {
+      const accountRow={}; ACCOUNT_FIELDS.forEach(k=>accountRow[k]='');
+      ['上月剩余','应付','转出','退款','理赔','课耗'].forEach(k=>accountRow[k]=0);
+      accountRow['年月']=`${y}-${m}`; accountRow['公司名称']=comp.name; accountRow['纳税人识别号']=comp.tax;
+      accountRow['类型']='预收学费'; accountRow['学员编号']=code; accountRow['学生姓名']=name; accountRow['学生年级']=grade;
+      accountRow['预收']=amt; accountRow['本月剩余']=amt;
+      accountData.push(accountRow);
+    }
+  } else {
+    // 新生：账户表新增记录（不单独建档，账户表即学员主数据来源）
+    const accountRow={}; ACCOUNT_FIELDS.forEach(k=>accountRow[k]='');
+    ['上月剩余','应付','转出','退款','理赔','课耗'].forEach(k=>accountRow[k]=0);
+    accountRow['年月']=`${y}-${m}`; accountRow['公司名称']=comp.name; accountRow['纳税人识别号']=comp.tax;
+    accountRow['类型']='预收学费'; accountRow['学员编号']=code; accountRow['学生姓名']=name; accountRow['学生年级']=grade;
+    accountRow['预收']=amt; accountRow['本月剩余']=amt;
+    accountData.push(accountRow);
+  }
+  state.selectedStudent={code, name, grade};
+  state.companyRoute='profile';
+  state.profileTab='enroll';
+  state.searchResults=null; state.searchText='';
+  closeModal(); render(); toast('报名成功，已跳转到该学员档案','ok');
+}
+function attendModal(){
+  const s=state.selectedStudent; if(!s) return;
+  const today=todayISO();
+  const grades=GRADES.map(g=>`<option value="${g}">${g}</option>`).join('');
+  const subjects=SUBJECTS.map(g=>`<option value="${g}">${g}</option>`).join('');
+  openModal(`<div class="modal-head">考勤<span class="modal-close" data-action="close-modal">×</span></div>
+    <div class="modal-body">
+      <label class="f"><span class="lab">学员姓名 <span class="req">*</span></span><input id="att-name" readonly value="${esc(s.name)}"/></label>
+      <div class="f-row">
+        <label class="f"><span class="lab">上课日期 <span class="req">*</span></span><span class="date-wrap"><input id="att-cdate" type="text" readonly class="dp-trigger" value="${today}" data-max="${today}" placeholder="yyyy-mm-dd"/></span><div class="err" id="att-err-cdate"></div></label>
+        <label class="f"><span class="lab">考勤日期 <span class="req">*</span></span><span class="date-wrap"><input id="att-adate" type="text" readonly class="dp-trigger" value="${today}" data-max="${today}" placeholder="yyyy-mm-dd"/></span><div class="err" id="att-err-adate"></div></label>
+      </div>
+      <label class="f"><span class="lab">课程年级 <span class="req">*</span></span><select id="att-cgrade" required><option value="" disabled selected hidden>请选择课程年级</option>${grades}</select><div class="err" id="att-err-cgrade"></div></label>
+      <label class="f"><span class="lab">科目 <span class="req">*</span></span><select id="att-subject" required><option value="" disabled selected hidden>请选择科目</option>${subjects}</select><div class="err" id="att-err-subject"></div></label>
+      <label class="f"><span class="lab">课耗金额（元） <span class="req">*</span></span><input id="att-amt" type="text" inputmode="decimal" placeholder="0.00"/><div class="err" id="att-err-amt"></div></label>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" data-action="close-modal">暂不考勤</button><button class="btn btn-primary" data-action="attend-submit" id="att-submit" disabled>立即考勤</button></div>`, true);
+  refreshAttendBtn();
+}
+function refreshAttendBtn(){
+  const b=document.getElementById('att-submit'); if(!b)return;
+  const cdate=document.getElementById('att-cdate'), cgrade=document.getElementById('att-cgrade'), subject=document.getElementById('att-subject'), adate=document.getElementById('att-adate'), amt=document.getElementById('att-amt');
+  const ok = cdate && cdate.value!=='' && cgrade && cgrade.value!=='' && subject && subject.value!=='' && adate && adate.value!=='' && amt && parseFloat(amt.value)>0;
+  b.disabled=!ok;
+}
+function setAttendErr(id, errId, msg){
+  const el=document.getElementById(id); if(el)el.classList.add('invalid');
+  const e=document.getElementById(errId); if(e)e.innerHTML=msg;
+}
+function attendSubmit(){
+  const s=state.selectedStudent;
+  if(!s){toast('未获取到学员信息','err');return;}
+  const code=s.code, name=s.name, grade=s.grade;
+  const cdate=document.getElementById('att-cdate').value;
+  const cgrade=document.getElementById('att-cgrade').value;
+  const subject=document.getElementById('att-subject').value;
+  const adate=document.getElementById('att-adate').value;
+  const amtEl=document.getElementById('att-amt');
+  const amt=parseFloat(amtEl.value);
+  if(!cdate){setAttendErr('att-cdate','att-err-cdate','请选择上课日期');return;}
+  if(!cgrade){setAttendErr('att-cgrade','att-err-cgrade','请选择课程年级');return;}
+  if(!subject){setAttendErr('att-subject','att-err-subject','请选择科目');return;}
+  if(!adate){setAttendErr('att-adate','att-err-adate','请选择考勤日期');return;}
+  if(!(amt>0)){setAttendErr('att-amt','att-err-amt','课耗金额须大于0');amtEl.focus();return;}
+  if(Math.round(amt*100)/100!==amt || amt>1000000){setAttendErr('att-amt','att-err-amt','金额最多2位小数且不超过100万');amtEl.focus();return;}
+  const comp=state.loggedIn; if(!comp){toast('未获取到登录公司信息','err');return;}
+  const remain=accountRemain(code, comp);
+  if(amt>remain){ toast('剩余金额不足，无法考勤！','err'); return; }
+  const [ay,am]=adate.split('-'); const ym=`${ay}-${am}`;
+  // 1) 课耗表新增一条记录（课耗记录 Tab 数据来源）
+  const rec={};
+  rec.date=adate; rec.company=comp.name; rec.name=name; rec.grade=grade;
+  rec.amt=amt; rec.subject=subject; rec['学员编号']=code;
+  rec['年月']=ym; rec['公司名称']=comp.name; rec['纳税人识别号']=comp.tax;
+  rec['考勤日期']=adate; rec['学生姓名']=name; rec['学生年级']=grade;
+  rec['课耗金额']=amt;
+  rec['课程子类型']='';
+  rec['课程年级']=cgrade; rec['科目']=subject; rec['课程季']='';
+  rec['上课日期']=cdate; rec['上课时间']=''; rec['教师']=''; rec['教师编码']='';
+  rec.id='c'+Date.now();
+  consumeData.push(rec);
+  // 2) 账户表更新（考勤月：课耗累加、本月剩余扣减）
+  const rows=accountData.filter(r=> r['学员编号']===code && (r['公司名称']===comp.name || r['纳税人识别号']===comp.tax));
+  const target=rows.find(r=>r['年月']===ym);
+  if(target){
+    target['课耗']=Math.round(((parseFloat(target['课耗'])||0)+amt)*100)/100;
+    target['本月剩余']=Math.round(((parseFloat(target['本月剩余'])||0)-amt)*100)/100;
+  } else {
+    let latest=null; rows.forEach(r=>{ if(!latest || r['年月']>latest['年月']) latest=r; });
+    const 上月剩余 = latest ? (parseFloat(latest['本月剩余'])||0) : 0;
+    const 预收 = latest ? (parseFloat(latest['预收'])||0) : 0;
+    const accountRow={}; ACCOUNT_FIELDS.forEach(k=>accountRow[k]='');
+    ['应付','转出','退款','理赔'].forEach(k=>accountRow[k]=0);
+    accountRow['年月']=ym; accountRow['公司名称']=comp.name; accountRow['纳税人识别号']=comp.tax;
+    accountRow['类型']='预收学费'; accountRow['学员编号']=code; accountRow['学生姓名']=name; accountRow['学生年级']=grade;
+    accountRow['上月剩余']=上月剩余; accountRow['预收']=预收; accountRow['课耗']=amt;
+    accountRow['本月剩余']=Math.round((上月剩余-amt)*100)/100;
+    accountData.push(accountRow);
+  }
+  state.profileTab='consume';
+  closeModal(); render(); toast('考勤成功','ok');
+}
+
+// 作废二次确认：点击课耗记录的「作废」按钮，先弹出确认框，确认后再走 voidConsume
+function confirmVoid(id, date, subject){
+  openModal(`
+    <div class="modal-body">
+      <p style="margin:0;font-size:15px;line-height:1.7;">请确认是否作废 <b>${esc(date)}</b> <b>${esc(subject)}</b> 的课耗？</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" data-action="close-modal">暂不作废</button>
+      <button class="btn btn-primary" data-action="consume-void-confirm" data-id="${esc(id)}">立即作废</button>
+    </div>
+  `);
+}
+
+// 作废课耗记录（撤销考勤）：删除课耗表记录，并回滚账户表对应考勤月的课耗与本月剩余
+function voidConsume(id){
+  if(!id){ return; }
+  const idx=consumeData.findIndex(r=>r.id===id);
+  if(idx<0){ toast('未找到该课耗记录','err'); return; }
+  const rec=consumeData[idx];
+  const amt=parseFloat(rec['课耗金额']!=null?rec['课耗金额']:rec.amt)||0;
+  const code=rec['学员编号'], ym=rec['年月'];
+  const comp=state.loggedIn;
+  if(!comp){ toast('未获取到登录公司信息','err'); return; }
+  // 1) 课耗表删除该记录
+  consumeData.splice(idx,1);
+  // 2) 账户表回滚：定位 学员编号 + 公司 + 考勤月，课耗减回、本月剩余加回
+  const target=accountData.find(r=> r['学员编号']===code && (r['公司名称']===comp.name || r['纳税人识别号']===comp.tax) && r['年月']===ym);
+  if(target){
+    target['课耗']=Math.round(((parseFloat(target['课耗'])||0)-amt)*100)/100;
+    target['本月剩余']=Math.round(((parseFloat(target['本月剩余'])||0)+amt)*100)/100;
+  }
+  toast('已作废该考勤记录','ok');
+  render();
+}
+
+// 作废报读二次确认：点击报读记录的「作废」按钮，先弹出确认框，确认后再走 voidEnroll
+function confirmEnrollVoid(id, date, amt){
+  openModal(`
+    <div class="modal-body">
+      <p style="margin:0;font-size:15px;line-height:1.7;">请确认是否作废 <b>${esc(date)}</b> 报读金额 <b>${esc(amt)}</b> 元的记录？</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" data-action="close-modal">暂不作废</button>
+      <button class="btn btn-primary" data-action="enroll-void-confirm" data-id="${esc(id)}">立即作废</button>
+    </div>
+  `);
+}
+
+// 作废报读记录（撤销报名）：删除出纳表对应预收学费记录，并回滚账户表的预收与本月剩余（与 enrollSubmit 相反）
+function voidEnroll(id){
+  if(!id){ return; }
+  const idx=cashData.findIndex(r=>r['id']===id);
+  if(idx<0){ toast('未找到该报读记录','err'); return; }
+  const rec=cashData[idx];
+  const amt=parseFloat(rec['交易金额'])||0;
+  const code=rec['学员编号'];
+  const compName=rec['公司名称'], compTax=rec['纳税人识别号'];
+  // 0) 余额校验：当前剩余学费不足覆盖该笔报读金额时，禁止作废（避免账户本月剩余变负）
+  const remain=accountRemain(code, {name:compName, tax:compTax});
+  if(remain < amt){ toast('剩余金额不足，无法作废该报读记录。','err'); return; }
+  // 1) 出纳表删除该记录
+  cashData.splice(idx,1);
+  // 2) 账户表回滚：定位 学员编号 + 公司 最新年月记录，预收减回、本月剩余扣减（报名是增加剩余）
+  const rows=accountData.filter(r=> r['学员编号']===code && (r['公司名称']===compName || r['纳税人识别号']===compTax));
+  let target=null;
+  rows.forEach(r=>{ if(!target || r['年月']>target['年月']) target=r; });
+  if(target){
+    target['预收']=Math.round(((parseFloat(target['预收'])||0)-amt)*100)/100;
+    target['本月剩余']=Math.round(((parseFloat(target['本月剩余'])||0)-amt)*100)/100;
+  }
+  toast('已作废该报读记录','ok');
+  render();
+}
+
+function downloadSource(month){
+  const y=state.dataYear, mm=String(month).padStart(2,'0'), ym=`${y}-${mm}`;
+  const snap = monthSource[ym] || {account:[],cash:[],consume:[]};
+  const blob=buildXLSXMulti([
+    {name:'账户表', headers:ACCOUNT_FIELDS, rows:snap.account},
+    {name:'出纳表', headers:CASH_FIELDS, rows:snap.cash},
+    {name:'课耗表', headers:CONSUME_FIELDS, rows:snap.consume}
+  ]);
+  const url=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=url;
+  const fname=(monthStatus[month]&&monthStatus[month].file)||`原excel数据_${ym}.xlsx`;
+  link.download=fname; link.click(); URL.revokeObjectURL(url);
+  toast(`已下载原excel数据（${ym}）：账户表 ${snap.account.length} 条 / 出纳表 ${snap.cash.length} 条 / 课耗表 ${snap.consume.length} 条`,'ok');
+}
+
+function doUpload(){
+  const f=document.getElementById('up-file');
+  const msg=document.getElementById('up-msg');
+  if(!f.files.length){msg.innerHTML='<div class="err">请先选择 Excel 文件</div>';return;}
+  if(f.files[0].name.toLowerCase().includes('fail')){
+    msg.innerHTML=`<div style="margin-top:8px;padding:12px;background:var(--danger-bg);border-radius:8px;font-size:13px;color:var(--danger);">
+      <b style="display:block;margin-bottom:6px;"><span class="i">${ICON.x}</span>导入失败（整批拒绝，未写入数据）</b>
+      <ol style="margin:0;padding-left:20px;line-height:1.8;">
+        <li>表头不一致</li>
+        <li>纳税人识别号无匹配</li>
+        <li>数据源年月≠当月</li>
+        <li>必填为空</li>
+      </ol>
+    </div>`;
+    return;
+  }
+  const d=new Date();const p=n=>String(n).padStart(2,'0');
+  const ts=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const m=state.uploadMonth;
+  if(m){monthStatus[m]={file:f.files[0].name, date:ts, status:'已导入'}; snapshotMonth(m);}
+  closeModal(); render(); toast('导入成功（覆盖当月数据）','ok');
+}
+
+function downloadTemplate(){
+  // 账户表（15 列）+ 一行示例
+  const aHead=['年月','公司名称','纳税人识别号','类型','学员编号','学生姓名','学生年级','上月剩余','应付','转出','预收','退款','理赔','课耗','本月剩余'];
+  const aRow=['2026-08','快乐智豪厦门文化有限公司','91350200MA8R5X2X9K','预收学费','XYBH_20260813100000','李宜栩','高三','1500.00','0.00','0.00','6800.00','0.00','0.00','2600.00','5700.00'];
+  // 出纳表（20 列）+ 一行示例
+  const bHead=['年月','公司名称','纳税人识别号','交易日期','交易渠道','交易金额','清算金额','手续费','团队','业务校区','学生姓名','学员编号','学生年级','现金','转账','刷卡','在线支付','单据编号','客户账号','类型'];
+  const bRow=['2026-08','快乐智豪厦门文化有限公司','91350200MA8R5X2X9K','2026-08-15','C扫B','6800.00','6800.00','0.00','厦门地区个性化团队','厦门帝豪个性化校区','李宜栩','XYBH_20260813100000','高三','0.00','0.00','0.00','6800.00','CZ_20260601000202','6222021234567890','预收学费'];
+  // 课耗表（20 列）+ 一行示例
+  const cHead=['年月','公司名称','纳税人识别号','考勤日期','学生姓名','学员编号','学生年级','课耗金额','消耗课时','课时长度','课程名称','课程类型','课程子类型','课程年级','科目','课程季','上课日期','上课时间','教师','教师编码'];
+  const cRow=['2026-08','快乐智豪厦门文化有限公司','91350200MA8R5X2X9K','2026-08-15','李宜栩','XYBH_20260813100000','高三','712.00','4','0.5','2026春季高二自然科学-帝豪4班','常规课程','Mini','高三','物理','2026厦门个性化春季班','2026-08-15','08:00','丁七七','dingqq'];
+  const blob=buildXLSXMulti([
+    {name:'账户表', headers:aHead, rows:[aRow]},
+    {name:'出纳表', headers:bHead, rows:[bRow]},
+    {name:'课耗表', headers:cHead, rows:[cRow]},
+  ]);
+  const d=new Date();const p=n=>String(n).padStart(2,'0');
+  const ts=`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`汇总数据导入模板${ts}.xlsx`;link.click();
+  URL.revokeObjectURL(url); toast('已下载导入模板（账户表 / 出纳表 / 课耗表 三表）','ok');
+}
+
+function crc32(buf){
+  let table=crc32.t;
+  if(!table){table=crc32.t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?0xEDB88320^(c>>>1):(c>>>1);table[n]=c>>>0;}}
+  let crc=0xFFFFFFFF;
+  for(let i=0;i<buf.length;i++)crc=table[(crc^buf[i])&0xFF]^(crc>>>8);
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function colLetter(i){let s='';i++;while(i>0){const rem=(i-1)%26;s=String.fromCharCode(65+rem)+s;i=Math.floor((i-1)/26);}return s;}
+/* 纯前端生成真实 .xlsx（OOXML + ZIP store，无外部依赖、离线可用，支持多工作表） */
+function xlsxSheetXml(headers, rows){
+  const sr=[];
+  sr.push(`<row r="1">${headers.map((h,i)=>`<c r="${colLetter(i)}1" t="inlineStr"><is><t xml:space="preserve">${esc(h)}</t></is></c>`).join('')}</row>`);
+  rows.forEach((row,ri)=>{
+    const r=ri+2;
+    const cells=row.map((v,i)=>{
+      const ref=colLetter(i)+r;
+      if(typeof v==='number'&&isFinite(v))return `<c r="${ref}" t="n"><v>${v}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v==null?'':v)}</t></is></c>`;
+    }).join('');
+    sr.push(`<row r="${r}">${cells}</row>`);
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sr.join('')}</sheetData></worksheet>`;
+}
+function zipFiles(files){
+  const enc=new TextEncoder();const parts=[];const central=[];let offset=0;
+  files.forEach(([name,data])=>{
+    const bytes=enc.encode(data);const crc=crc32(bytes);const nb=enc.encode(name);
+    const FLAG_UTF8=0x0800;  // general purpose bit flag: filename is UTF-8 (支持中文 sheet name)
+    const lh=new Uint8Array(30+nb.length);const lv=new DataView(lh.buffer);
+    lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,FLAG_UTF8,true);lv.setUint16(8,0,true);lv.setUint16(10,0,true);lv.setUint16(12,0,true);
+    lv.setUint32(14,crc,true);lv.setUint32(18,bytes.length,true);lv.setUint32(22,bytes.length,true);lv.setUint16(26,nb.length,true);lv.setUint16(28,0,true);
+    lh.set(nb,30);parts.push(lh,bytes);
+    const ch=new Uint8Array(46+nb.length);const cv=new DataView(ch.buffer);
+    cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,FLAG_UTF8,true);cv.setUint16(10,0,true);cv.setUint16(12,0,true);
+    cv.setUint32(16,crc,true);cv.setUint32(20,bytes.length,true);cv.setUint32(24,bytes.length,true);cv.setUint16(28,nb.length,true);cv.setUint16(30,0,true);cv.setUint16(32,0,true);cv.setUint16(34,0,true);cv.setUint16(36,0,true);cv.setUint32(38,0,true);cv.setUint32(42,offset,true);
+    ch.set(nb,46);central.push(ch);offset+=lh.length+bytes.length;
+  });
+  const totalCentral=central.reduce((a,c)=>a+c.length,0);
+  const eocd=new Uint8Array(22);const ev=new DataView(eocd.buffer);
+  ev.setUint32(0,0x06054b50,true);ev.setUint16(4,0,true);ev.setUint16(6,0,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,totalCentral,true);ev.setUint32(16,offset,true);ev.setUint16(20,0,true);
+  return new Blob([...parts,...central,eocd],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function buildXLSXMulti(sheets){
+  const sheetXmls=sheets.map(s=>xlsxSheetXml(s.headers, s.rows));
+  const sheetEls=sheets.map((s,i)=>`<sheet name="${esc(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('');
+  const workbookXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetEls}</sheets></workbook>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}</Relationships>`;
+  const overrides=[
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>`,
+    ...sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+  ].join('');
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${overrides}</Types>`;
+  const rootRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const files=[['[Content_Types].xml',contentTypes],['_rels/.rels',rootRels],['xl/workbook.xml',workbookXml],['xl/_rels/workbook.xml.rels',rels],...sheets.map((s,i)=>[`xl/worksheets/sheet${i+1}.xml`,sheetXmls[i]])];
+  return zipFiles(files);
+}
+function buildXLSX(headers, rows){ return buildXLSXMulti([{name:'Sheet1', headers, rows}]); }
+function exportReport(kind){
+  const conf = kind==='perf'
+    ? {name:'业绩报表', cols:[{k:'date',t:'交易日期'},{k:'amt',t:'交易金额'},{k:'name',t:'学员姓名'}], rows:getPerfRows(), num:['amt']}
+    : {name:'课耗报表', cols:[{k:'date',t:'考勤日期'},{k:'name',t:'学员姓名'},{k:'课程年级',t:'课程年级'},{k:'amt',t:'课耗金额'},{k:'subject',t:'科目'}], rows:consumeData, num:['amt']};
+  const st=state[kind];
+  const filtered=conf.rows.filter(r=>r.date>=st.start&&r.date<=st.end);
+  const headers=conf.cols.map(c=>c.t);
+  const rows=filtered.map(r=>conf.cols.map(c=>{let v=r[c.k];if(conf.num.includes(c.k)&&v!==''&&v!=null)v=Number(v);return v;}));
+  const blob=buildXLSX(headers,rows);
+  const url=URL.createObjectURL(blob);const link=document.createElement('a');
+  link.href=url;link.download=`${conf.name}_${state.loggedIn.name}_${st.start}-${st.end}.xlsx`;link.click();
+  URL.revokeObjectURL(url); toast(`已导出 ${filtered.length} 条（不受分页限制）`,'ok');
+}
+
+/* ============ 启动 ============ */
+renderApp();
+</script>
+</body>
+</html>

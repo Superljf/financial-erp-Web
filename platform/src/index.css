@@ -1,0 +1,33 @@
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f5f7fa;
+  color: #1d2129;
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+#root {
+  margin: 0;
+  min-height: 100vh;
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 流线曲线纹理，与原型 HTML 一致 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900' preserveAspectRatio='none'><defs><linearGradient id='g1' x1='0' x2='1'><stop offset='0' stop-color='%23dde9ff' stop-opacity='.5'/><stop offset='1' stop-color='%23dde9ff' stop-opacity='0'/></linearGradient><linearGradient id='g2' x1='0' x2='1'><stop offset='0' stop-color='%23ccd9f5' stop-opacity='.4'/><stop offset='1' stop-color='%23ccd9f5' stop-opacity='0'/></linearGradient></defs><path d='M-100 380 Q400 200 900 320 T1700 220' fill='none' stroke='url(%23g1)' stroke-width='160'/><path d='M-100 580 Q500 440 1000 540 T1700 470' fill='none' stroke='url(%23g2)' stroke-width='110'/><path d='M-100 760 Q600 660 1100 720 T1700 690' fill='none' stroke='url(%23g1)' stroke-width='80'/></svg>");
+  background-size: cover;
+  background-position: center;
+}
