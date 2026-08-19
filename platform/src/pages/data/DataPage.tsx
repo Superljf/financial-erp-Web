@@ -1,14 +1,15 @@
 import { CheckOutlined, DownloadOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { Button, Select, Table, Tabs, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   downloadMonthSource,
   downloadTemplate,
   getCompanyImportMatrix,
   getMonthStatus,
 } from '../../services/import';
-import { ApiError } from '../../services/http';
+import { isAbortError } from '../../services/http';
+import { useAbortableEffect } from '../../hooks/useAbortableEffect';
 import type { CompanyImportRow, MonthImportStatus } from '../../types';
 import UploadModal from './UploadModal';
 
@@ -24,27 +25,28 @@ export default function DataPage() {
   const [uploadMonth, setUploadMonth] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [months, companies] = await Promise.all([
-        getMonthStatus(year, page - 1, 10),
-        getCompanyImportMatrix(year),
-      ]);
-      setMonthRows(months.content);
-      setMonthTotal(months.totalElements);
-      setMatrix(companies);
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return;
-      message.error(err instanceof ApiError ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [year, page]);
+  const loadData = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const [months, companies] = await Promise.all([
+          getMonthStatus(year, page - 1, 10, signal),
+          getCompanyImportMatrix(year, signal),
+        ]);
+        if (signal?.aborted) return;
+        setMonthRows(months.content);
+        setMonthTotal(months.totalElements);
+        setMatrix(companies);
+      } catch (err) {
+        if (isAbortError(err)) return;
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [year, page],
+  );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  useAbortableEffect((signal) => loadData(signal), [loadData]);
 
   const monthColumns: ColumnsType<MonthImportStatus> = [
     {
@@ -64,8 +66,8 @@ export default function DataPage() {
               try {
                 await downloadMonthSource(year, row.month);
                 message.success('已下载原excel数据');
-              } catch (err) {
-                message.error(err instanceof Error ? err.message : '下载失败');
+              } catch {
+                /* 错误由 request 统一 toast */
               }
             }}
             title={row.fileName}
@@ -143,8 +145,8 @@ export default function DataPage() {
                 try {
                   await downloadTemplate();
                   message.success('已下载导入模板（账户表 / 出纳表 / 课耗表 三表）');
-                } catch (err) {
-                  message.error(err instanceof Error ? err.message : '下载失败');
+                } catch {
+                  /* 错误由 request 统一 toast */
                 }
               }}
             >
@@ -177,7 +179,7 @@ export default function DataPage() {
         onClose={() => setUploadMonth(null)}
         onSuccess={async () => {
           setUploadMonth(null);
-          await reload();
+          await loadData();
         }}
       />
     </div>

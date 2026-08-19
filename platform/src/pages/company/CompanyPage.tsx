@@ -1,9 +1,10 @@
 import { EditOutlined, EyeInvisibleOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { Button, Input, Table, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { createCompany, listCompanies, updateCompany } from '../../services/company';
-import { ApiError } from '../../services/http';
+import { isAbortError } from '../../services/http';
+import { useAbortableEffect } from '../../hooks/useAbortableEffect';
 import type { Company } from '../../types';
 import CompanyFormModal from './CompanyFormModal';
 
@@ -46,28 +47,32 @@ export default function CompanyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [pwdCache, setPwdCache] = useState<Record<number, string>>({});
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await listCompanies({
-        taxNo: appliedTax,
-        name: appliedName,
-        page: page - 1,
-        size: pageSize,
-      });
-      setRows(data.content);
-      setTotal(data.totalElements);
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return;
-      message.error(err instanceof ApiError ? err.message : '加载公司列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [appliedTax, appliedName, page, pageSize]);
+  const loadList = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const data = await listCompanies(
+          {
+            taxNo: appliedTax,
+            name: appliedName,
+            page: page - 1,
+            size: pageSize,
+          },
+          signal,
+        );
+        if (signal?.aborted) return;
+        setRows(data.content);
+        setTotal(data.totalElements);
+      } catch (err) {
+        if (isAbortError(err)) return;
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [appliedTax, appliedName, page, pageSize],
+  );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  useAbortableEffect((signal) => loadList(signal), [loadList]);
 
   const filteredFlag = Boolean(appliedTax || appliedName);
 
@@ -208,9 +213,9 @@ export default function CompanyPage() {
               message.success('保存成功');
             }
             setModalOpen(false);
-            await reload();
-          } catch (err) {
-            message.error(err instanceof Error ? err.message : '保存失败');
+            await loadList();
+          } catch {
+            /* 错误由 request 统一 toast */
           } finally {
             setSubmitting(false);
           }

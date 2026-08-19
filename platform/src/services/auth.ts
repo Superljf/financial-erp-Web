@@ -25,12 +25,21 @@ function toImageSrc(raw: string): string {
   return `data:image/png;base64,${raw}`;
 }
 
+/** 开发环境 StrictMode 会连续触发两次 effect，合并为一次进行中的请求 */
+let inflightCaptcha: Promise<CaptchaData> | null = null;
+
 export async function fetchCaptcha(): Promise<CaptchaData> {
-  const data = await requestJson<CaptchaResponse>('/api/auth/captcha', { skipAuth: true });
-  return {
-    captchaId: data.captchaId,
-    imageSrc: toImageSrc(data.imageBase64),
-  };
+  if (!inflightCaptcha) {
+    inflightCaptcha = requestJson<CaptchaResponse>('/api/auth/captcha', { skipAuth: true })
+      .then((data) => ({
+        captchaId: data.captchaId,
+        imageSrc: toImageSrc(data.imageBase64),
+      }))
+      .finally(() => {
+        inflightCaptcha = null;
+      });
+  }
+  return inflightCaptcha;
 }
 
 export async function loginAdmin(payload: LoginPayload): Promise<LoginResponse> {

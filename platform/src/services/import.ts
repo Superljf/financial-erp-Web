@@ -36,9 +36,11 @@ export async function getMonthStatus(
   year: number,
   page: number,
   size: number,
+  signal?: AbortSignal,
 ): Promise<PageResult<MonthImportStatus>> {
   const data = await requestJson<PageResult<MonthImportRow>>(
     `/api/admin/imports/months${queryString({ year, page, size })}`,
+    { signal },
   );
   return {
     ...data,
@@ -46,9 +48,13 @@ export async function getMonthStatus(
   };
 }
 
-export async function getCompanyImportMatrix(year: number): Promise<CompanyImportRow[]> {
+export async function getCompanyImportMatrix(
+  year: number,
+  signal?: AbortSignal,
+): Promise<CompanyImportRow[]> {
   const data = await requestJson<CompanyImportMatrix>(
     `/api/admin/imports/companies${queryString({ year })}`,
+    { signal },
   );
   return (data.companies ?? []).map((row) => ({
     companyId: row.companyId,
@@ -74,5 +80,6 @@ export async function uploadMonthFile(year: number, month: number, file: File): 
   await requestJson(`/api/admin/imports/${year}/${month}`, {
     method: 'POST',
     body: form,
+    skipErrorToast: true,
   });
 }

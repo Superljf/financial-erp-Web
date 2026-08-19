@@ -1,14 +1,28 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { App } from 'antd';
 import { AuthContext } from './AuthContext';
-import { clearToken, getToken, setToken, setUnauthorizedHandler } from '../services/http';
+import {
+  clearToken,
+  getToken,
+  setRequestErrorNotifier,
+  setToken,
+  setUnauthorizedHandler,
+} from '../services/http';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { message } = App.useApp();
   const [loggedIn, setLoggedIn] = useState(() => Boolean(getToken()));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setUnauthorizedHandler(() => setLoggedIn(false));
-    return () => setUnauthorizedHandler(null);
-  }, []);
+    setRequestErrorNotifier((content) => {
+      message.error(content);
+    });
+    return () => {
+      setUnauthorizedHandler(null);
+      setRequestErrorNotifier(null);
+    };
+  }, [message]);
 
   const value = useMemo(
     () => ({

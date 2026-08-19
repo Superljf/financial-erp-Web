@@ -18,10 +18,33 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+export type RequestOptions = RequestInit & {
+  skipAuth?: boolean;
+  json?: unknown;
+  /** 由调用方自行展示错误时跳过全局 toast */
+  skipErrorToast?: boolean;
+};
+
 let onUnauthorized: (() => void) | null = null;
+let errorNotifier: ((content: string) => void) | null = null;
+let lastErrorToast = '';
+let lastErrorToastAt = 0;
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   onUnauthorized = handler;
+}
+
+export function setRequestErrorNotifier(notifier: ((content: string) => void) | null) {
+  errorNotifier = notifier;
+}
+
+function notifyError(content: string, skipToast?: boolean) {
+  if (skipToast || !content) return;
+  const now = Date.now();
+  if (content === lastErrorToast && now - lastErrorToastAt < 1000) return;
+  lastErrorToast = content;
+  lastErrorToastAt = now;
+  errorNotifier?.(content);
 }
 
 export function getToken(): string {
@@ -83,7 +106,12 @@ function failMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
-async function handleResponse<T>(path: string, res: Response): Promise<T> {
+function throwApiError(message: string, status: number, data?: unknown, skipToast?: boolean): never {
+  notifyError(message, skipToast);
+  throw new ApiError(message, status, data);
+}
+
+async function handleResponse<T>(path: string, res: Response, skipToast?: boolean): Promise<T> {
   if (res.status === 401 || res.status === 403) {
     triggerUnauthorized(path);
   }
@@ -92,23 +120,29 @@ async function handleResponse<T>(path: string, res: Response): Promise<T> {
   if (body && typeof body === 'object' && 'success' in body) {
     const envelope = body as ApiEnvelope<T>;
     if (!envelope.success) {
-      throw new ApiError(envelope.message || '请求失败', res.status, envelope.data);
+      throwApiError(envelope.message || '请求失败', res.status, envelope.data, skipToast);
     }
     return envelope.data;
   }
 
   if (!res.ok) {
-    throw new ApiError(failMessage(body, res.statusText || '请求失败'), res.status, body);
+    throwApiError(failMessage(body, res.statusText || '请求失败'), res.status, body, skipToast);
   }
 
   return (body as T) ?? (undefined as T);
 }
 
-export async function requestJson<T>(
-  path: string,
-  options: RequestInit & { skipAuth?: boolean; json?: unknown } = {},
-): Promise<T> {
-  const { skipAuth, json, headers: extraHeaders, ...rest } = options;
+function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === 'AbortError') ||
+    (err instanceof Error && err.name === 'AbortError')
+  );
+}
+
+export { isAbortError };
+
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { skipAuth, json, skipErrorToast, headers: extraHeaders, ...rest } = options;
   const headers = authHeaders(extraHeaders, skipAuth);
   let body = rest.body;
   if (json !== undefined) {
@@ -119,23 +153,25 @@ export async function requestJson<T>(
   let res: Response;
   try {
     res = await fetch(path, { ...rest, headers, body });
-  } catch {
-    throw new ApiError('无法连接服务器，请确认后端已启动', 0);
+  } catch (err) {
+    if (isAbortError(err)) throw err;
+    throwApiError('无法连接服务器，请确认后端已启动', 0, undefined, skipErrorToast);
   }
 
-  return handleResponse<T>(path, res);
+  return handleResponse<T>(path, res, skipErrorToast);
 }
 
 export async function requestBlob(
   path: string,
   fallbackName: string,
+  options: Pick<RequestOptions, 'skipErrorToast'> = {},
 ): Promise<{ blob: Blob; filename: string }> {
   const headers = authHeaders();
   let res: Response;
   try {
     res = await fetch(path, { headers });
   } catch {
-    throw new ApiError('无法连接服务器，请确认后端已启动', 0);
+    throwApiError('无法连接服务器，请确认后端已启动', 0, undefined, options.skipErrorToast);
   }
 
   const contentType = res.headers.get('content-type') ?? '';
@@ -144,9 +180,9 @@ export async function requestBlob(
     const body = await parseJsonSafe(res);
     if (body && typeof body === 'object' && 'success' in body) {
       const envelope = body as ApiEnvelope<unknown>;
-      throw new ApiError(envelope.message || '下载失败', res.status, envelope.data);
+      throwApiError(envelope.message || '下载失败', res.status, envelope.data, options.skipErrorToast);
     }
-    throw new ApiError(failMessage(body, '下载失败'), res.status, body);
+    throwApiError(failMessage(body, '下载失败'), res.status, body, options.skipErrorToast);
   }
 
   const blob = await res.blob();

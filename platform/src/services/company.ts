@@ -33,7 +33,10 @@ function mapCompany(row: CompanyResponse): Company {
   };
 }
 
-export async function listCompanies(query: CompanyQuery): Promise<PageResult<Company>> {
+export async function listCompanies(
+  query: CompanyQuery,
+  signal?: AbortSignal,
+): Promise<PageResult<Company>> {
   const data = await requestJson<PageResult<CompanyResponse>>(
     `/api/admin/companies${queryString({
       taxNo: query.taxNo?.trim(),
@@ -41,6 +44,7 @@ export async function listCompanies(query: CompanyQuery): Promise<PageResult<Com
       page: query.page,
       size: query.size,
     })}`,
+    { signal },
   );
   return {
     ...data,

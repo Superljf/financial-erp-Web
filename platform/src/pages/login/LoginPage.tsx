@@ -28,8 +28,8 @@ export default function LoginPage() {
       setCaptchaId(data.captchaId);
       setCaptchaSrc(data.imageSrc);
       form.setFieldsValue({ captchaCode: '' });
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : '无法获取验证码');
+    } catch {
+      /* 错误由 request 统一 toast */
     } finally {
       setCaptchaLoading(false);
     }
@@ -37,7 +37,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     void refreshCaptcha();
-  }, [refreshCaptcha]);
+    // 仅进入登录页时拉一次；点击图片 / 登录失败再刷新
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 避免 form 引用变化导致重复请求
+  }, []);
 
   const onFinish = async () => {
     const username = (form.getFieldValue('username') ?? '').trim();
@@ -67,12 +69,6 @@ export default function LoginPage() {
       message.success('登录成功');
       navigate('/companies', { replace: true });
     } catch (err) {
-      const text = err instanceof Error ? err.message : '登录失败';
-      if (text.includes('验证码')) {
-        form.setFields([{ name: 'captchaCode', errors: [text] }]);
-      } else {
-        message.error(text);
-      }
       if (!(err instanceof ApiError && err.status === 0)) {
         void refreshCaptcha();
       }

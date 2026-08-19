@@ -114,13 +114,7 @@ export default function UploadModal({ open, year, month, onClose, onSuccess }: P
         <Button
           type="link"
           icon={<DownloadOutlined />}
-          onClick={async () => {
-            try {
-              await downloadTemplate();
-            } catch (err) {
-              message.error(err instanceof Error ? err.message : '下载失败');
-            }
-          }}
+          onClick={() => void downloadTemplate()}
           style={{ paddingLeft: 0 }}
         >
           下载导入模板（标准表头）
