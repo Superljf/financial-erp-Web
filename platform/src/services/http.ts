@@ -141,6 +141,12 @@ function isAbortError(err: unknown): boolean {
 
 export { isAbortError };
 
+const inflightMutations = new Map<string, Promise<unknown>>();
+
+function isMutatingMethod(method: string): boolean {
+  return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+}
+
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { skipAuth, json, skipErrorToast, headers: extraHeaders, ...rest } = options;
   const headers = authHeaders(extraHeaders, skipAuth);
@@ -150,15 +156,33 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     body = JSON.stringify(json);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(path, { ...rest, headers, body });
-  } catch (err) {
-    if (isAbortError(err)) throw err;
-    throwApiError('无法连接服务器，请确认后端已启动', 0, undefined, skipErrorToast);
+  const method = String(rest.method ?? 'GET').toUpperCase();
+  const lockKey = isMutatingMethod(method) ? `${method} ${path}` : '';
+  if (lockKey && inflightMutations.has(lockKey)) {
+    throwApiError('请勿重复提交', 429, undefined, skipErrorToast);
   }
 
-  return handleResponse<T>(path, res, skipErrorToast);
+  const send = async (): Promise<T> => {
+    let res: Response;
+    try {
+      res = await fetch(path, { ...rest, headers, body });
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      throwApiError('无法连接服务器，请确认后端已启动', 0, undefined, skipErrorToast);
+    }
+    return handleResponse<T>(path, res, skipErrorToast);
+  };
+
+  if (!lockKey) {
+    return send();
+  }
+  const pending = send();
+  inflightMutations.set(lockKey, pending);
+  try {
+    return await pending;
+  } finally {
+    inflightMutations.delete(lockKey);
+  }
 }
 
 export async function requestBlob(

@@ -67,6 +67,7 @@ export default function UploadModal({ open, year, month, onClose, onSuccess }: P
       okText="开始上传"
       cancelText="取消"
       confirmLoading={loading}
+      okButtonProps={{ disabled: loading }}
       width={520}
       destroyOnClose
     >
